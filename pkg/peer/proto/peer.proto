@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package proto_peer;
+
+option go_package = "pkg/peer/proto";
+
+service PeerService {
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty) {};
+}
