@@ -1,8 +1,24 @@
 {
   "cSpell.words": [
+    "durationcheck",
     "emptypb",
+    "errcheck",
+    "exportloopref",
+    "forcetypeassert",
+    "gofmt",
+    "gosimple",
+    "ineffassign",
+    "Lann",
     "leadelection",
     "lelannchangroberts",
-    "protobuf"
-  ]
+    "makezero",
+    "nilerr",
+    "predeclared",
+    "protobuf",
+    "staticcheck",
+    "tenv",
+    "unconvert",
+    "unparam"
+  ],
+  "makefile.configureOnOpen": true
 }

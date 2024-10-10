@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	pb "leadelection/pkg/peer/proto"
+	pb "leadelection/pkg/lcr/internal/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -14,9 +14,8 @@ import (
 
 // Client is a gRPC client wrapper.
 type Client struct {
-	address    string
 	conn       *grpc.ClientConn
-	grpcClient pb.PeerServiceClient
+	grpcClient pb.LCRServiceClient
 }
 
 // New creates a new gRPC client.
@@ -26,10 +25,9 @@ func New(address string, opts ...grpc.DialOption) (*Client, error) {
 		return nil, fmt.Errorf("failed to dial: %v", err)
 	}
 
-	grpcClient := pb.NewPeerServiceClient(conn)
+	grpcClient := pb.NewLCRServiceClient(conn)
 
 	return &Client{
-		address:    address,
 		grpcClient: grpcClient,
 		conn:       conn,
 	}, nil
@@ -49,10 +47,19 @@ func (c *Client) Close() {
 	}
 }
 
-func (c Client) GetAddress() string {
-	return c.address
+// RPC for sending a message to the next process (to the left).
+func (c *Client) Message(ctx context.Context, in *pb.LCRMessage) (*pb.LCRResponse, error) {
+	return c.grpcClient.Message(ctx, in)
 }
 
-func (c *Client) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	return c.grpcClient.Ping(ctx, in, opts...)
+// RPC to notify the current process that the leader has been elected and termination is starting.
+func (c *Client) NotifyTermination(ctx context.Context, in *pb.LCRMessage) (*pb.LCRResponse, error) {
+	return c.grpcClient.NotifyTermination(ctx, in)
+}
+
+// RPC to ping the current node to check if it is still alive.
+func (c *Client) Ping(ctx context.Context) error {
+	_, err := c.grpcClient.Ping(ctx, &emptypb.Empty{})
+
+	return err
 }
