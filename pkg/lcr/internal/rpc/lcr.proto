@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 package lcr;
 
@@ -15,12 +16,15 @@ enum Status {
 
 // The message sent between processes in the LCR algorithm.
 message LCRMessage {
-  uint64 uid = 1;  // Unique identifier for the process.
+  uint64 uid = 1;
+  string message_id = 2;
+  google.protobuf.Timestamp start_time = 3;
 }
 
 // Response message to acknowledge receipt of LCRMessage or termination.
 message LCRResponse {
-  Status status = 1;  // Can be "RECEIVED", "DISCARDED", etc.
+  Status status = 1;
+  string message_id = 2;
 }
 
 // The LCR service definition.

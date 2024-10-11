@@ -49,16 +49,27 @@ func (c *Client) Close() {
 
 // RPC for sending a message to the next process (to the left).
 func (c *Client) Message(ctx context.Context, in *pb.LCRMessage) (*pb.LCRResponse, error) {
+	if c.grpcClient == nil {
+		return nil, nil
+	}
+
 	return c.grpcClient.Message(ctx, in)
 }
 
 // RPC to notify the current process that the leader has been elected and termination is starting.
 func (c *Client) NotifyTermination(ctx context.Context, in *pb.LCRMessage) (*pb.LCRResponse, error) {
+	if c.grpcClient == nil {
+		return nil, nil
+	}
+
 	return c.grpcClient.NotifyTermination(ctx, in)
 }
 
 // RPC to ping the current node to check if it is still alive.
 func (c *Client) Ping(ctx context.Context) error {
+	if c.grpcClient == nil {
+		return nil
+	}
 	_, err := c.grpcClient.Ping(ctx, &emptypb.Empty{})
 
 	return err

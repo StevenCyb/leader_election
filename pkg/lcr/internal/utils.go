@@ -14,6 +14,25 @@ func (o *OrderedUIDList) AddOrdered(uid uint64) {
 	*o = append((*o)[:i], append([]uint64{uid}, (*o)[i:]...)...)
 }
 
+// RemoveOrdered removes a value from the SortedList, keeping it sorted.
+func (o *OrderedUIDList) RemoveOrdered(uid uint64) {
+	index := o.GetIndexFor(uid)
+	if index != -1 {
+		*o = append((*o)[:index], (*o)[index+1:]...)
+	}
+}
+
+// Get returns the value at the given index in the SortedList.
+func (o OrderedUIDList) GetIndexFor(number uint64) int {
+	for i, v := range o {
+		if v == number {
+			return i
+		}
+	}
+
+	return -1
+}
+
 // GetNext returns the next value in the SortedList, wrapping around.
 func (o OrderedUIDList) GetNext(index int) uint64 {
 	return o[index%len(o)]

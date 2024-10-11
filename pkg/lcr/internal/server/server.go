@@ -44,12 +44,14 @@ func New(listen string, opt ...grpc.ServerOption) (*Server, error) {
 	time.Sleep(time.Millisecond * 100) // give the listener time to start
 
 	grpcServer := grpc.NewServer(opt...)
-	pb.RegisterLCRServiceServer(grpcServer, &Server{})
-
-	return &Server{
+	server := &Server{
 		grpcServer: grpcServer,
 		listener:   listener,
-	}, nil
+	}
+
+	pb.RegisterLCRServiceServer(grpcServer, server)
+
+	return server, nil
 }
 
 // NewTLS creates a new gRPC server with TLS.
@@ -91,7 +93,7 @@ func (s *Server) OnMessage(callback MessageFunc) {
 // NotifyTermination implements rpc.LCRServiceServer.
 func (s *Server) NotifyTermination(ctx context.Context, req *pb.LCRMessage) (*pb.LCRResponse, error) {
 	if s.onNotifyTermination == nil {
-		return nil, ErrCallbackNotSet
+		panic(ErrCallbackNotSet)
 	}
 
 	return s.onNotifyTermination(ctx, req)
@@ -100,7 +102,7 @@ func (s *Server) NotifyTermination(ctx context.Context, req *pb.LCRMessage) (*pb
 // Message implements rpc.LCRServiceServer.
 func (s *Server) Message(ctx context.Context, req *pb.LCRMessage) (*pb.LCRResponse, error) {
 	if s.onMessage == nil {
-		return nil, ErrCallbackNotSet
+		panic(ErrCallbackNotSet)
 	}
 
 	return s.onMessage(ctx, req)
