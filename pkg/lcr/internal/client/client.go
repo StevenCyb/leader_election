@@ -34,10 +34,10 @@ func New(address string, opts ...grpc.DialOption) (*Client, error) {
 }
 
 // NewTLS creates a new gRPC client with TLS.
-func NewTLS(address string, certPool *x509.CertPool) (*Client, error) {
-	cred := credentials.NewTLS(&tls.Config{ServerName: "", RootCAs: certPool})
+func NewTLS(address string, certPool *x509.CertPool, opts ...grpc.DialOption) (*Client, error) {
+	opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{ServerName: "", RootCAs: certPool})))
 
-	return New(address, grpc.WithTransportCredentials(cred))
+	return New(address, opts...)
 }
 
 // Close closes the gRPC client.

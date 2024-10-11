@@ -11,6 +11,8 @@ import (
 	"leadelection/pkg/lcr/internal/server"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc"
 )
 
 var ErrNodeAlreadyExists = errors.New("node already exists")
@@ -28,12 +30,11 @@ type LeadElection struct {
 	// Dynamic fields
 	performElectionMutex sync.Mutex
 	stop                 chan struct{}
-
-	nodes             map[uint64]*client.Client
-	orderedNodeUIDs   internal.OrderedUIDList
-	neighborNodeIndex int
-
-	leader *uint64
+	nodesMutex           sync.RWMutex
+	nodes                map[uint64]*client.Client
+	orderedNodeUIDs      internal.OrderedUIDList
+	neighborNodeIndex    int
+	leader               *uint64
 }
 
 // New creates a new LeadElection instance.
@@ -103,8 +104,12 @@ func (le *LeadElection) Start(delay time.Duration, checkEvery time.Duration) err
 						continue
 					}
 					ctx, cancel := context.WithTimeout(context.Background(), checkEvery)
+					le.nodesMutex.RLock()
 					if err := le.nodes[*le.leader].Ping(ctx); err != nil {
+						le.nodesMutex.RUnlock()
 						le.startElection()
+					} else {
+						le.nodesMutex.RUnlock()
 					}
 					cancel()
 					time.Sleep(checkEvery)
@@ -118,6 +123,9 @@ func (le *LeadElection) Start(delay time.Duration, checkEvery time.Duration) err
 
 // Stop stops the cluster.
 func (le *LeadElection) Stop() {
+	le.nodesMutex.Lock()
+	defer le.nodesMutex.Unlock()
+
 	le.server.Close()
 	close(le.stop)
 
@@ -133,12 +141,12 @@ func (le *LeadElection) Stop() {
 }
 
 // AddNode adds a new node to the cluster.
-func (le *LeadElection) AddNode(uid uint64, addr string) error {
+func (le *LeadElection) AddNode(uid uint64, addr string, opts ...grpc.DialOption) error {
 	if le.isTLS {
 		return ErrNonTLSNode
 	}
 
-	cl, err := client.New(addr)
+	cl, err := client.New(addr, opts...)
 	if err != nil {
 		return err
 	}
@@ -147,12 +155,12 @@ func (le *LeadElection) AddNode(uid uint64, addr string) error {
 }
 
 // AddTLSNode adds a new node to the cluster with TLS.
-func (le *LeadElection) AddTLSNode(uid uint64, addr string, certPool *x509.CertPool) error {
+func (le *LeadElection) AddTLSNode(uid uint64, addr string, certPool *x509.CertPool, opts ...grpc.DialOption) error {
 	if !le.isTLS {
 		return ErrTLSNode
 	}
 
-	cl, err := client.NewTLS(addr, certPool)
+	cl, err := client.NewTLS(addr, certPool, opts...)
 	if err != nil {
 		return err
 	}
@@ -208,8 +216,12 @@ func (le *LeadElection) onTermination(ctx context.Context, req *pb.LCRMessage) (
 
 	go func() {
 		le.leader = &req.Uid
+		le.nodesMutex.RLock()
 		if len(le.orderedNodeUIDs) > 1 {
+			le.nodesMutex.RUnlock()
 			le.sendTermination(ctx, req)
+		} else {
+			le.nodesMutex.RUnlock()
 		}
 
 		le.performElectionMutex.Unlock()
@@ -230,6 +242,9 @@ func (le *LeadElection) startElection() {
 }
 
 func (le *LeadElection) sendTermination(ctx context.Context, req *pb.LCRMessage) *pb.LCRResponse {
+	le.nodesMutex.Lock()
+	defer le.nodesMutex.Unlock()
+
 	index := le.neighborNodeIndex
 	sendTo := le.orderedNodeUIDs.GetNext(index)
 
@@ -250,6 +265,9 @@ func (le *LeadElection) sendTermination(ctx context.Context, req *pb.LCRMessage)
 }
 
 func (le *LeadElection) sendMessage(ctx context.Context, req *pb.LCRMessage) *pb.LCRResponse {
+	le.nodesMutex.Lock()
+	defer le.nodesMutex.Unlock()
+
 	index := le.neighborNodeIndex
 	sendTo := le.orderedNodeUIDs.GetNext(index)
 
@@ -270,6 +288,9 @@ func (le *LeadElection) sendMessage(ctx context.Context, req *pb.LCRMessage) *pb
 }
 
 func (le *LeadElection) addAnyNode(uid uint64, cl *client.Client) error {
+	le.nodesMutex.Lock()
+	defer le.nodesMutex.Unlock()
+
 	if _, ok := le.nodes[uid]; ok {
 		return ErrNodeAlreadyExists
 	}
