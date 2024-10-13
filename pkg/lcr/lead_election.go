@@ -25,13 +25,17 @@ var ErrTimeout = errors.New("timeout")
 var ErrTLSNode = errors.New("node is TLS, use AddTLSNode instead")
 var ErrNonTLSNode = errors.New("node is not TLS, use AddNode instead")
 
+// OnLeaderChangeFunc is a callback function that is called when the leader changes.
+type OnLeaderChangeFunc func(leader *uint64)
+
 // LeadElection represents the LeLann-Chang-Roberts (LCR) algorithm for leader election.
 type LeadElection struct {
 	// Unchanged fields
-	uid    uint64
-	listen string
-	isTLS  bool
-	server *server.Server
+	uid                uint64
+	listen             string
+	isTLS              bool
+	server             *server.Server
+	onLeaderChangeFunc OnLeaderChangeFunc
 	// Dynamic fields
 	performElectionMutex sync.Mutex
 	stop                 chan struct{}
@@ -163,6 +167,12 @@ func (le *LeadElection) Stop() {
 	le.performElectionMutex = sync.Mutex{}
 }
 
+// OnLeaderChange sets the callback function that is called when the leader changes.
+// Leader is nil if no leader known yet or old leader is not reachable and new election is ongoing.
+func (le *LeadElection) OnLeaderChange(f OnLeaderChangeFunc) {
+	le.onLeaderChangeFunc = f
+}
+
 // AddNode adds a new node to the cluster.
 func (le *LeadElection) AddNode(uid uint64, addr string, opts ...grpc.DialOption) error {
 	if le.isTLS {
@@ -257,6 +267,9 @@ func (le *LeadElection) onTermination(_ context.Context, req *pb.LCRMessage) (*p
 	if req.Uid == le.uid {
 		le.log("Terminate by message[%s] with self (%d) as leader after %s", req.MessageId, le.uid, time.Since(req.StartTime.AsTime()).String())
 		le.leader = &req.Uid
+		if le.onLeaderChangeFunc != nil {
+			le.onLeaderChangeFunc(le.leader)
+		}
 
 		return &pb.LCRResponse{Status: pb.Status_RECEIVED, MessageId: req.MessageId}, nil
 	}
@@ -264,6 +277,9 @@ func (le *LeadElection) onTermination(_ context.Context, req *pb.LCRMessage) (*p
 	le.log("Propagate termination message[%s] for leader %d", req.MessageId, req.Uid)
 
 	le.leader = &req.Uid
+	if le.onLeaderChangeFunc != nil {
+		le.onLeaderChangeFunc(le.leader)
+	}
 	le.log("New leader is %d", req.Uid)
 
 	if resp := le.sendTermination(req); resp != nil && resp.Status == pb.Status_DISCARDED {
@@ -288,6 +304,9 @@ func (le *LeadElection) startElection() {
 	}
 
 	le.leader = &le.uid
+	if le.onLeaderChangeFunc != nil {
+		le.onLeaderChangeFunc(le.leader)
+	}
 	le.performElectionMutex.Unlock()
 	le.log("Election accepted for self leader %v on message[%s] after %s", le.uid, req.MessageId, time.Since(req.StartTime.AsTime()).String())
 }
@@ -329,6 +348,9 @@ func (le *LeadElection) sendMessage(req *pb.LCRMessage) *pb.LCRResponse {
 	}()
 
 	le.leader = nil
+	if le.onLeaderChangeFunc != nil {
+		le.onLeaderChangeFunc(le.leader)
+	}
 	index := le.neighborNodeIndex
 	sendTo := le.orderedNodeUIDs.GetNext(index)
 
