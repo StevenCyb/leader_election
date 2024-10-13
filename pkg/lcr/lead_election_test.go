@@ -13,15 +13,15 @@ import (
 
 type ClusterTester struct {
 	t                 *testing.T
-	Instances         map[uint64]*LeadElection
-	InactiveInstances map[uint64]*LeadElection
-	CurrentLeader     uint64
+	instances         map[uint64]*LeadElection
+	inactiveInstances map[uint64]*LeadElection
+	currentLeader     uint64
 }
 
 func (c *ClusterTester) Cleanup() {
 	c.t.Helper()
 
-	for _, instance := range c.Instances {
+	for _, instance := range c.instances {
 		instance.Stop()
 	}
 }
@@ -34,48 +34,48 @@ func (c *ClusterTester) AddInstance(id uint64) {
 	newInstance, err := New(id, listen)
 	require.NoError(c.t, err)
 
-	for _, instance := range c.Instances {
+	for _, instance := range c.instances {
 		require.NoError(c.t, instance.AddNode(id, listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 		require.NoError(c.t, newInstance.AddNode(instance.uid, instance.listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 	}
-	for _, instance := range c.InactiveInstances {
+	for _, instance := range c.inactiveInstances {
 		require.NoError(c.t, instance.AddNode(id, listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 	}
 
 	newInstance.MustStart(time.Millisecond*500, time.Millisecond*100)
 
-	c.Instances[id] = newInstance
+	c.instances[id] = newInstance
 }
 
 func (c *ClusterTester) Kill(id uint64) {
 	c.t.Helper()
 
-	instance, ok := c.Instances[id]
+	instance, ok := c.instances[id]
 	require.True(c.t, ok)
 
 	instance.Stop()
-	delete(c.Instances, id)
-	c.InactiveInstances[id] = instance
+	delete(c.instances, id)
+	c.inactiveInstances[id] = instance
 }
 
 func (c *ClusterTester) Revive(id uint64) {
 	c.t.Helper()
 
-	inactiveInstance, ok := c.InactiveInstances[id]
+	inactiveInstance, ok := c.inactiveInstances[id]
 	require.True(c.t, ok)
 
-	delete(c.InactiveInstances, id)
+	delete(c.inactiveInstances, id)
 
 	newInstance, err := New(id, inactiveInstance.listen)
 	require.NoError(c.t, err)
 
 	newInstance.OnLeaderChange(func(leader *uint64) {
 		if leader != nil {
-			require.Equal(c.t, c.CurrentLeader, *leader)
+			require.Equal(c.t, c.currentLeader, *leader)
 		}
 	})
 
-	for _, instance := range c.Instances {
+	for _, instance := range c.instances {
 		require.NoError(c.t, instance.RemoveNode(id), fmt.Sprintf("failed to remove node %d from instance %d", id, instance.uid))
 		require.NoError(c.t, instance.AddNode(inactiveInstance.uid, inactiveInstance.listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 		require.NoError(c.t, newInstance.AddNode(instance.uid, instance.listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
@@ -83,16 +83,16 @@ func (c *ClusterTester) Revive(id uint64) {
 
 	newInstance.MustStart(time.Millisecond*500, time.Millisecond*100)
 
-	c.Instances[id] = newInstance
+	c.instances[id] = newInstance
 }
 
 func (c *ClusterTester) ExpectLeader(delay time.Duration, expect uint64) {
 	c.t.Helper()
 
-	c.CurrentLeader = expect
+	c.currentLeader = expect
 	time.Sleep(delay)
 
-	for _, instance := range c.Instances {
+	for _, instance := range c.instances {
 		actual := instance.GetLeader()
 
 		require.NotNil(c.t, actual, fmt.Sprintf("leader in nil in instance %d", instance.uid))
@@ -105,8 +105,8 @@ func TestLeadElection_LCR_Simple(t *testing.T) {
 
 	ct := ClusterTester{
 		t:                 t,
-		Instances:         make(map[uint64]*LeadElection),
-		InactiveInstances: make(map[uint64]*LeadElection),
+		instances:         make(map[uint64]*LeadElection),
+		inactiveInstances: make(map[uint64]*LeadElection),
 	}
 	t.Cleanup(ct.Cleanup)
 
@@ -123,8 +123,8 @@ func TestLeadElection_LCR_DeadLeader(t *testing.T) {
 
 	ct := ClusterTester{
 		t:                 t,
-		Instances:         make(map[uint64]*LeadElection),
-		InactiveInstances: make(map[uint64]*LeadElection),
+		instances:         make(map[uint64]*LeadElection),
+		inactiveInstances: make(map[uint64]*LeadElection),
 	}
 	t.Cleanup(ct.Cleanup)
 
@@ -141,8 +141,8 @@ func TestLeadElection_LCR_DeadLeader_Revived(t *testing.T) {
 
 	ct := ClusterTester{
 		t:                 t,
-		Instances:         make(map[uint64]*LeadElection),
-		InactiveInstances: make(map[uint64]*LeadElection),
+		instances:         make(map[uint64]*LeadElection),
+		inactiveInstances: make(map[uint64]*LeadElection),
 	}
 	t.Cleanup(ct.Cleanup)
 
