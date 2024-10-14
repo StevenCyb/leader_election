@@ -1,5 +1,9 @@
 # LeLann, Chang and Roberts (LCR)
-The LCR (LeLann, Chang, and Roberts) algorithm is a leader election method used in ring networks. Each node sends its unique ID around the ring, and the node with the highest ID becomes the leader. Once a node identifies itself as the leader, it sends a termination message around the ring to inform all other nodes.
+## **DO NOT USE THIS: This implementation is not accurate to the algorithm. I will leave it here for now but this implementation might be recreated or removed later.**
+   
+The LCR (LeLann, Chang, and Roberts) algorithm is a leader election method used in ring networks. 
+Each node sends its unique ID around the ring, and the node with the highest ID becomes the leader. 
+Once a node identifies itself as the leader, it sends a termination message around the ring to inform all other nodes.
 
 ## Usage
 On you service setup the LCR service like this:

@@ -118,7 +118,7 @@ func (le *LeadElection) MustStart(delay time.Duration, checkInterval time.Durati
 	}()
 }
 
-// Stop stops the cluster.
+// Stop stops the service.
 func (le *LeadElection) Stop() {
 	le.logger.Info("Stop leader election service")
 
@@ -126,9 +126,7 @@ func (le *LeadElection) Stop() {
 	le.server.Close()
 
 	le.nodesMutex.Lock()
-	defer func() {
-		le.nodesMutex.Unlock()
-	}()
+	defer le.nodesMutex.Unlock()
 
 	for _, cl := range le.nodes {
 		if cl != nil {
@@ -151,9 +149,7 @@ func (le *LeadElection) OnLeaderChange(f OnLeaderChangeFunc) {
 // AddNode adds a new node to the cluster.
 func (le *LeadElection) AddNode(uid uint64, addr string, opts ...grpc.DialOption) error {
 	le.nodesMutex.Lock()
-	defer func() {
-		le.nodesMutex.Unlock()
-	}()
+	defer le.nodesMutex.Unlock()
 
 	if _, ok := le.nodes[uid]; ok {
 		return ErrNodeAlreadyExists
@@ -179,9 +175,7 @@ func (le *LeadElection) AddNode(uid uint64, addr string, opts ...grpc.DialOption
 // RemoveNode removes a node from the cluster.
 func (le *LeadElection) RemoveNode(uid uint64) error {
 	le.nodesMutex.Lock()
-	defer func() {
-		le.nodesMutex.Unlock()
-	}()
+	defer le.nodesMutex.Unlock()
 
 	if _, ok := le.nodes[uid]; !ok {
 		return ErrNodeNotExists
@@ -294,9 +288,7 @@ func (le *LeadElection) startElection() {
 
 func (le *LeadElection) sendTermination(req *pb.LCRMessage) *pb.LCRResponse {
 	le.nodesMutex.RLock()
-	defer func() {
-		le.nodesMutex.RUnlock()
-	}()
+	defer le.nodesMutex.RUnlock()
 
 	index := le.neighborNodeIndex
 	sendTo := le.orderedNodeUIDs.GetNext(index)
@@ -324,9 +316,7 @@ func (le *LeadElection) sendTermination(req *pb.LCRMessage) *pb.LCRResponse {
 
 func (le *LeadElection) sendMessage(req *pb.LCRMessage) *pb.LCRResponse {
 	le.nodesMutex.RLock()
-	defer func() {
-		le.nodesMutex.RUnlock()
-	}()
+	defer le.nodesMutex.RUnlock()
 
 	le.leader = nil
 	if le.onLeaderChangeFunc != nil {

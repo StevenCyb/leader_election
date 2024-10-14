@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package hs;
+
+option go_package = "pkg/hs/internal/rpc";
+
+// Enum for message status.
+enum Status {
+  UNKNOWN = 0;
+  RECEIVED = 1;
+  DISCARDED = 2;
+  PROCESSED = 3;
+  REPLY_SENT = 4;
+  LEADER_ELECTED = 5;
+}
+
+// Enum for message direction.
+enum Direction {
+  LEFT = 0;
+  RIGHT = 1;
+}
+
+// Message to be sent to the HS service as a probe.
+message ProbeMessage {
+  uint64 uid = 1;
+  uint32 hops = 2;
+  Direction direction = 3;
+  uint32 phase = 4;
+}
+
+// Message to be sent to the HS service as a reply.
+message ReplyMessage {
+  uint64 uid = 1;
+  uint32 phase = 2;
+}
+
+// Message to terminate the election process.
+message TerminateMessage {
+  uint64 uid = 1;
+}
+
+// Response from the HS service.
+message HSResponse {
+  Status status = 1;
+}
+
+// The HS service definition.
+service HSService {
+
+  // Probe RPC to send a probe message to the HS service.
+  rpc Probe(ProbeMessage) returns (HSResponse);
+
+  // Reply RPC to send a reply message to the HS service.
+  rpc Reply(ReplyMessage) returns (HSResponse);
+
+  // Terminate RPC to stop the election process.
+  rpc Terminate(TerminateMessage) returns (HSResponse);
+
+  // Ping RPC to check if the node is alive.
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

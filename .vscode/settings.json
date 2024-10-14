@@ -10,6 +10,7 @@
     "gofmt",
     "gosimple",
     "grpclog",
+    "Hirschenberg",
     "ineffassign",
     "Infof",
     "Lann",
