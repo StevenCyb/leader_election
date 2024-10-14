@@ -257,9 +257,15 @@ func (le *LeadElection) onMessage(_ context.Context, req *pb.LCRMessage) (*pb.LC
 	}
 
 	// req.Uid < le.uid
-	le.log("Discard message[%s] for leader %d", req.MessageId, req.Uid)
+	// Replace the ID with the highest one and propagate
+	le.log("Received lower ID %d, replacing with own ID %d and propagating", req.Uid, le.uid)
+	req.Uid = le.uid
+	if resp := le.sendMessage(req); resp != nil && resp.Status == pb.Status_DISCARDED {
+		le.log("Discard message[%s] for leader due neighbor discarded candidate %d", req.MessageId, req.Uid)
+		return &pb.LCRResponse{Status: pb.Status_DISCARDED, MessageId: req.MessageId}, nil
+	}
 
-	return &pb.LCRResponse{Status: pb.Status_DISCARDED, MessageId: req.MessageId}, nil
+	return &pb.LCRResponse{Status: pb.Status_RECEIVED, MessageId: req.MessageId}, nil
 }
 
 func (le *LeadElection) onTermination(_ context.Context, req *pb.LCRMessage) (*pb.LCRResponse, error) {
@@ -301,14 +307,12 @@ func (le *LeadElection) startElection() {
 		le.performElectionMutex.Unlock()
 
 		return
+	} else if resp == nil {
+		le.log("Election accepted for self leader %v on message[%s] after %s", le.uid, req.MessageId, time.Since(req.StartTime.AsTime()).String())
+		le.leader = &le.uid
 	}
 
-	le.leader = &le.uid
-	if le.onLeaderChangeFunc != nil {
-		le.onLeaderChangeFunc(le.leader)
-	}
 	le.performElectionMutex.Unlock()
-	le.log("Election accepted for self leader %v on message[%s] after %s", le.uid, req.MessageId, time.Since(req.StartTime.AsTime()).String())
 }
 
 func (le *LeadElection) sendTermination(req *pb.LCRMessage) *pb.LCRResponse {

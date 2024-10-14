@@ -71,7 +71,7 @@ func (c *ClusterTester) Revive(id uint64) {
 
 	newInstance.OnLeaderChange(func(leader *uint64) {
 		if leader != nil {
-			require.Equal(c.t, c.currentLeader, *leader)
+			require.Equal(c.t, int(c.currentLeader), int(*leader), fmt.Sprintf("leader mismatch in instance %d", id))
 		}
 	})
 
@@ -96,7 +96,7 @@ func (c *ClusterTester) ExpectLeader(delay time.Duration, expect uint64) {
 		actual := instance.GetLeader()
 
 		require.NotNil(c.t, actual, fmt.Sprintf("leader in nil in instance %d", instance.uid))
-		require.Equal(c.t, expect, *actual, fmt.Sprintf("leader mismatch in instance %d", instance.uid))
+		require.Equal(c.t, int(expect), int(*actual), fmt.Sprintf("leader mismatch in instance %d", instance.uid))
 	}
 }
 
@@ -114,8 +114,9 @@ func TestLeadElection_LCR_Simple(t *testing.T) {
 	ct.ExpectLeader(time.Second, 10)
 	ct.AddInstance(20)
 	ct.ExpectLeader(time.Second*2, 20)
-	ct.AddInstance(30)
-	ct.ExpectLeader(time.Second*2, 30)
+	ct.AddInstance(15)
+	ct.AddInstance(5)
+	ct.ExpectLeader(time.Second*2, 20)
 }
 
 func TestLeadElection_LCR_DeadLeader(t *testing.T) {
