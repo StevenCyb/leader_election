@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -11,7 +10,6 @@ import (
 	pb "leadelection/pkg/lcr/internal/rpc"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -52,13 +50,6 @@ func New(listen string, opt ...grpc.ServerOption) (*Server, error) {
 	pb.RegisterLCRServiceServer(grpcServer, server)
 
 	return server, nil
-}
-
-// NewTLS creates a new gRPC server with TLS.
-func NewTLS(listen string, cert tls.Certificate) (*Server, error) {
-	cred := credentials.NewTLS(&tls.Config{Certificates: []tls.Certificate{cert}})
-
-	return New(listen, grpc.Creds(cred))
 }
 
 // Start starts the gRPC server.

@@ -2,8 +2,6 @@ package lcr
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"leadelection/pkg/lcr/internal"
 	"leadelection/pkg/lcr/internal/client"
@@ -33,7 +31,6 @@ type LeadElection struct {
 	// Unchanged fields
 	uid                uint64
 	listen             string
-	isTLS              bool
 	server             *server.Server
 	onLeaderChangeFunc OnLeaderChangeFunc
 	logger             log.ILogger
@@ -48,8 +45,8 @@ type LeadElection struct {
 }
 
 // New creates a new LeadElection instance.
-func New(uid uint64, listen string, logger log.ILogger) (*LeadElection, error) {
-	s, err := server.New(listen)
+func New(uid uint64, listen string, logger log.ILogger, opt ...grpc.ServerOption) (*LeadElection, error) {
+	s, err := server.New(listen, opt...)
 	if err != nil {
 		return nil, err
 	}
@@ -59,31 +56,6 @@ func New(uid uint64, listen string, logger log.ILogger) (*LeadElection, error) {
 		listen:          listen,
 		logger:          logger,
 		server:          s,
-		isTLS:           false,
-		stop:            make(chan struct{}),
-		orderedNodeUIDs: internal.OrderedUIDList{uid},
-		nodes:           map[uint64]*client.Client{uid: nil},
-	}
-
-	s.OnNotifyTermination(le.onTermination)
-	s.OnMessage(le.onMessage)
-
-	return le, nil
-}
-
-// NewTLS creates a new LeadElection instance with TLS.
-func NewTLS(uid uint64, listen string, cert tls.Certificate, logger log.ILogger) (*LeadElection, error) {
-	s, err := server.NewTLS(listen, cert)
-	if err != nil {
-		return nil, err
-	}
-
-	le := &LeadElection{
-		uid:             uid,
-		listen:          listen,
-		logger:          logger,
-		server:          s,
-		isTLS:           true,
 		stop:            make(chan struct{}),
 		orderedNodeUIDs: internal.OrderedUIDList{uid},
 		nodes:           map[uint64]*client.Client{uid: nil},
@@ -178,8 +150,13 @@ func (le *LeadElection) OnLeaderChange(f OnLeaderChangeFunc) {
 
 // AddNode adds a new node to the cluster.
 func (le *LeadElection) AddNode(uid uint64, addr string, opts ...grpc.DialOption) error {
-	if le.isTLS {
-		return ErrNonTLSNode
+	le.nodesMutex.Lock()
+	defer func() {
+		le.nodesMutex.Unlock()
+	}()
+
+	if _, ok := le.nodes[uid]; ok {
+		return ErrNodeAlreadyExists
 	}
 
 	cl, err := client.New(addr, opts...)
@@ -187,21 +164,16 @@ func (le *LeadElection) AddNode(uid uint64, addr string, opts ...grpc.DialOption
 		return err
 	}
 
-	return le.addAnyNode(uid, cl)
-}
-
-// AddTLSNode adds a new node to the cluster with TLS.
-func (le *LeadElection) AddTLSNode(uid uint64, addr string, certPool *x509.CertPool, opts ...grpc.DialOption) error {
-	if !le.isTLS {
-		return ErrTLSNode
+	le.nodes[uid] = cl
+	le.orderedNodeUIDs.AddOrdered(uid)
+	if neighborIndex := le.orderedNodeUIDs.FindNeighbor(le.uid); neighborIndex != nil {
+		le.neighborNodeIndex = *neighborIndex
+	} else {
+		panic("could not find self in ordered list, this is an internal bug, please open an issue at https://github.com/StevenCyb/go_lead_election/issues.")
 	}
+	le.logger.Tracef("Added node %d, own idex %d, neighbor index %d", uid, le.orderedNodeUIDs.GetIndexFor(le.uid), le.neighborNodeIndex)
 
-	cl, err := client.NewTLS(addr, certPool, opts...)
-	if err != nil {
-		return err
-	}
-
-	return le.addAnyNode(uid, cl)
+	return nil
 }
 
 // RemoveNode removes a node from the cluster.
@@ -382,26 +354,4 @@ func (le *LeadElection) sendMessage(req *pb.LCRMessage) *pb.LCRResponse {
 			return resp
 		}
 	}
-}
-
-func (le *LeadElection) addAnyNode(uid uint64, cl *client.Client) error {
-	le.nodesMutex.Lock()
-	defer func() {
-		le.nodesMutex.Unlock()
-	}()
-
-	if _, ok := le.nodes[uid]; ok {
-		return ErrNodeAlreadyExists
-	}
-
-	le.nodes[uid] = cl
-	le.orderedNodeUIDs.AddOrdered(uid)
-	if neighborIndex := le.orderedNodeUIDs.FindNeighbor(le.uid); neighborIndex != nil {
-		le.neighborNodeIndex = *neighborIndex
-	} else {
-		panic("could not find self in ordered list, this is an internal bug, please open an issue at https://github.com/StevenCyb/go_lead_election/issues.")
-	}
-	le.logger.Tracef("Added node %d, own idex %d, neighbor index %d", uid, le.orderedNodeUIDs.GetIndexFor(le.uid), le.neighborNodeIndex)
-
-	return nil
 }

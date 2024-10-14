@@ -2,13 +2,10 @@ package client
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	pb "leadelection/pkg/lcr/internal/rpc"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -31,13 +28,6 @@ func New(address string, opts ...grpc.DialOption) (*Client, error) {
 		grpcClient: grpcClient,
 		conn:       conn,
 	}, nil
-}
-
-// NewTLS creates a new gRPC client with TLS.
-func NewTLS(address string, certPool *x509.CertPool, opts ...grpc.DialOption) (*Client, error) {
-	opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{ServerName: "", RootCAs: certPool})))
-
-	return New(address, opts...)
 }
 
 // Close closes the gRPC client.
