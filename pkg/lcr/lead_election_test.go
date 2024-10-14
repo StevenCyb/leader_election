@@ -3,6 +3,7 @@ package lcr
 import (
 	"fmt"
 	"leadelection/pkg/internal"
+	"leadelection/pkg/log"
 	"testing"
 	"time"
 
@@ -31,7 +32,8 @@ func (c *ClusterTester) AddInstance(id uint64) {
 
 	port := internal.GetFreeLocalPort(c.t)
 	listen := fmt.Sprintf("localhost:%d", port)
-	newInstance, err := New(id, listen)
+	logger := log.New().SetName(fmt.Sprintf("I%d", id)).Build()
+	newInstance, err := New(id, listen, logger)
 	require.NoError(c.t, err)
 
 	for _, instance := range c.instances {
@@ -66,7 +68,7 @@ func (c *ClusterTester) Revive(id uint64) {
 
 	delete(c.inactiveInstances, id)
 
-	newInstance, err := New(id, inactiveInstance.listen)
+	newInstance, err := New(id, inactiveInstance.listen, inactiveInstance.logger)
 	require.NoError(c.t, err)
 
 	newInstance.OnLeaderChange(func(leader *uint64) {

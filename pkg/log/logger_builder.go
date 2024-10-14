@@ -75,7 +75,7 @@ type LoggerBuilder struct {
 
 func New() *LoggerBuilder {
 	return &LoggerBuilder{
-		level:  LEVEL_WARNING,
+		level:  LEVEL_INFO,
 		format: FORMAT_TEXT,
 	}
 }
