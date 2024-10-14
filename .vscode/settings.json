@@ -1,5 +1,6 @@
 {
   "cSpell.words": [
+    "Debugf",
     "durationcheck",
     "emptypb",
     "errcheck",
@@ -8,6 +9,7 @@
     "gofmt",
     "gosimple",
     "ineffassign",
+    "Infof",
     "Lann",
     "leadelection",
     "lelannchangroberts",
@@ -18,8 +20,10 @@
     "staticcheck",
     "tenv",
     "timestamppb",
+    "Tracef",
     "unconvert",
-    "unparam"
+    "unparam",
+    "Warningf"
   ],
   "makefile.configureOnOpen": true
 }
