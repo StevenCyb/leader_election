@@ -69,7 +69,7 @@ func New(uid uint64, listen string, logger log.ILogger, opt ...grpc.ServerOption
 
 // MustStart starts the the leader election service or panics if server can not start.
 // New leader will be elected if current leader is unknown or unreachable within 5 seconds.
-func (le *LeadElection) MustStart(delay time.Duration, checkEvery time.Duration) {
+func (le *LeadElection) MustStart(delay time.Duration, checkInterval time.Duration) {
 	le.logger.Info("Start leader election service")
 	go func() {
 		err := le.server.Start()
@@ -92,11 +92,11 @@ func (le *LeadElection) MustStart(delay time.Duration, checkEvery time.Duration)
 			default:
 				if le.leader == nil {
 					le.startElection()
-					time.Sleep(checkEvery)
+					time.Sleep(checkInterval)
 					continue
 				}
 				if *le.leader == le.uid {
-					time.Sleep(checkEvery)
+					time.Sleep(checkInterval)
 					continue
 				}
 				le.nodesMutex.RLock()
@@ -112,7 +112,7 @@ func (le *LeadElection) MustStart(delay time.Duration, checkEvery time.Duration)
 					le.nodesMutex.RUnlock()
 				}
 				cancel()
-				time.Sleep(checkEvery)
+				time.Sleep(checkInterval)
 			}
 		}
 	}()
