@@ -9,7 +9,31 @@ The leader then informs all other nodes.
 ## Usage
 On you service setup the HS service like this:
 ```go
-TODO
+uid, err := strconv.ParseUint(os.Getenv("LB_ID"), 10, 64)
+// ...
+logger := log.New().Build()
+instance, err := New(uid, listen, logger)
+// ...
+// Add left and right neighbor nodes:
+instance.AddLeftNeighborNode(uid, listen, grpc.WithTransportCredentials(insecure.NewCredentials()))
+instance.AddRightNeighborNode(uid, listen, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// ...
+// Start the leader service
+instance.MustStart(delayDuration, checkIntervalDuration)
+// ...
+// Optionally register for leader change event if needed
+instance.OnLeaderChange(func(leader *uint64) {
+	if leader != nil {
+    // Got new leader
+	}
+})
+// Get the leader
+leader := instance.GetLeader()
+// Check if is leader 
+if instance.IsLeader() {
+  // ...
+}
+// ...
 ```
 
 It is recommended to use TLS or even better mutual TLS to secure the communication. 

@@ -8,10 +8,10 @@ Once a node identifies itself as the leader, it sends a termination message arou
 ## Usage
 On you service setup the LCR service like this:
 ```go
-id, err := strconv.ParseUint(os.Getenv("LB_ID"), 10, 64)
+uid, err := strconv.ParseUint(os.Getenv("LB_ID"), 10, 64)
 // ...
 logger := log.New().Build()
-instance, err := New(id, listen, logger)
+instance, err := New(uid, listen, logger)
 // ...
 // Add all other nodes from the cluster with there id and listen address
 instance.AddNode(id, listen, grpc.WithTransportCredentials(insecure.NewCredentials()))
