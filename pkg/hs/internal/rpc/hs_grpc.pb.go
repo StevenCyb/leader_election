@@ -33,11 +33,11 @@ const (
 // The HS service definition.
 type HSServiceClient interface {
 	// Probe RPC to send a probe message to the HS service.
-	Probe(ctx context.Context, in *ProbeMessage, opts ...grpc.CallOption) (*HSResponse, error)
+	Probe(ctx context.Context, in *ProbeMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Reply RPC to send a reply message to the HS service.
-	Reply(ctx context.Context, in *ReplyMessage, opts ...grpc.CallOption) (*HSResponse, error)
+	Reply(ctx context.Context, in *ReplyMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Terminate RPC to stop the election process.
-	Terminate(ctx context.Context, in *TerminateMessage, opts ...grpc.CallOption) (*HSResponse, error)
+	Terminate(ctx context.Context, in *TerminateMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Ping RPC to check if the node is alive.
 	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -50,9 +50,9 @@ func NewHSServiceClient(cc grpc.ClientConnInterface) HSServiceClient {
 	return &hSServiceClient{cc}
 }
 
-func (c *hSServiceClient) Probe(ctx context.Context, in *ProbeMessage, opts ...grpc.CallOption) (*HSResponse, error) {
+func (c *hSServiceClient) Probe(ctx context.Context, in *ProbeMessage, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(HSResponse)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, HSService_Probe_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -60,9 +60,9 @@ func (c *hSServiceClient) Probe(ctx context.Context, in *ProbeMessage, opts ...g
 	return out, nil
 }
 
-func (c *hSServiceClient) Reply(ctx context.Context, in *ReplyMessage, opts ...grpc.CallOption) (*HSResponse, error) {
+func (c *hSServiceClient) Reply(ctx context.Context, in *ReplyMessage, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(HSResponse)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, HSService_Reply_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -70,9 +70,9 @@ func (c *hSServiceClient) Reply(ctx context.Context, in *ReplyMessage, opts ...g
 	return out, nil
 }
 
-func (c *hSServiceClient) Terminate(ctx context.Context, in *TerminateMessage, opts ...grpc.CallOption) (*HSResponse, error) {
+func (c *hSServiceClient) Terminate(ctx context.Context, in *TerminateMessage, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(HSResponse)
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, HSService_Terminate_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -97,11 +97,11 @@ func (c *hSServiceClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...g
 // The HS service definition.
 type HSServiceServer interface {
 	// Probe RPC to send a probe message to the HS service.
-	Probe(context.Context, *ProbeMessage) (*HSResponse, error)
+	Probe(context.Context, *ProbeMessage) (*emptypb.Empty, error)
 	// Reply RPC to send a reply message to the HS service.
-	Reply(context.Context, *ReplyMessage) (*HSResponse, error)
+	Reply(context.Context, *ReplyMessage) (*emptypb.Empty, error)
 	// Terminate RPC to stop the election process.
-	Terminate(context.Context, *TerminateMessage) (*HSResponse, error)
+	Terminate(context.Context, *TerminateMessage) (*emptypb.Empty, error)
 	// Ping RPC to check if the node is alive.
 	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	mustEmbedUnimplementedHSServiceServer()
@@ -114,13 +114,13 @@ type HSServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedHSServiceServer struct{}
 
-func (UnimplementedHSServiceServer) Probe(context.Context, *ProbeMessage) (*HSResponse, error) {
+func (UnimplementedHSServiceServer) Probe(context.Context, *ProbeMessage) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Probe not implemented")
 }
-func (UnimplementedHSServiceServer) Reply(context.Context, *ReplyMessage) (*HSResponse, error) {
+func (UnimplementedHSServiceServer) Reply(context.Context, *ReplyMessage) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Reply not implemented")
 }
-func (UnimplementedHSServiceServer) Terminate(context.Context, *TerminateMessage) (*HSResponse, error) {
+func (UnimplementedHSServiceServer) Terminate(context.Context, *TerminateMessage) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Terminate not implemented")
 }
 func (UnimplementedHSServiceServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

@@ -38,30 +38,36 @@ func (c *Client) Close() {
 }
 
 // Probe for sending a message to the next process (to the left).
-func (c *Client) Probe(ctx context.Context, in *pb.ProbeMessage) (*pb.HSResponse, error) {
+func (c *Client) Probe(ctx context.Context, in *pb.ProbeMessage) error {
 	if c.grpcClient == nil {
-		return nil, nil
+		return nil
 	}
 
-	return c.grpcClient.Probe(ctx, in)
+	_, err := c.grpcClient.Probe(ctx, in)
+
+	return err
 }
 
 // Reply for sending a message to the previous process (to the right).
-func (c *Client) Reply(ctx context.Context, in *pb.ReplyMessage) (*pb.HSResponse, error) {
+func (c *Client) Reply(ctx context.Context, in *pb.ReplyMessage) error {
 	if c.grpcClient == nil {
-		return nil, nil
+		return nil
 	}
 
-	return c.grpcClient.Reply(ctx, in)
+	_, err := c.grpcClient.Reply(ctx, in)
+
+	return err
 }
 
 // Terminate for sending a message to terminate the process.
-func (c *Client) Terminate(ctx context.Context, in *pb.TerminateMessage) (*pb.HSResponse, error) {
+func (c *Client) Terminate(ctx context.Context, in *pb.TerminateMessage) error {
 	if c.grpcClient == nil {
-		return nil, nil
+		return nil
 	}
 
-	return c.grpcClient.Terminate(ctx, in)
+	_, err := c.grpcClient.Terminate(ctx, in)
+
+	return err
 }
 
 // RPC to ping the current node to check if it is still alive.

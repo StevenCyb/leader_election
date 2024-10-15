@@ -16,13 +16,13 @@ import (
 var ErrCallbackNotSet = errors.New("callback is not set")
 
 // ProbeFunc is a callback function for Probe.
-type ProbeFunc func(context.Context, *pb.ProbeMessage) (*pb.HSResponse, error)
+type ProbeFunc func(context.Context, *pb.ProbeMessage) (*emptypb.Empty, error)
 
 // ReplyFunc is a callback function for Reply.
-type ReplyFunc func(context.Context, *pb.ReplyMessage) (*pb.HSResponse, error)
+type ReplyFunc func(context.Context, *pb.ReplyMessage) (*emptypb.Empty, error)
 
 // TerminateFunc is a callback function for Terminate.
-type TerminateFunc func(context.Context, *pb.TerminateMessage) (*pb.HSResponse, error)
+type TerminateFunc func(context.Context, *pb.TerminateMessage) (*emptypb.Empty, error)
 
 // Server is a gRPC server.
 type Server struct {
@@ -91,30 +91,30 @@ func (s *Server) OnTerminate(callback TerminateFunc) {
 }
 
 // Probe implements rpc.HSServiceServer.
-func (s *Server) Probe(context.Context, *pb.ProbeMessage) (*pb.HSResponse, error) {
+func (s *Server) Probe(ctx context.Context, req *pb.ProbeMessage) (*emptypb.Empty, error) {
 	if s.onProbe == nil {
 		return nil, ErrCallbackNotSet
 	}
 
-	return s.onProbe(context.Background(), nil)
+	return s.onProbe(ctx, req)
 }
 
 // Reply implements rpc.HSServiceServer.
-func (s *Server) Reply(context.Context, *pb.ReplyMessage) (*pb.HSResponse, error) {
+func (s *Server) Reply(ctx context.Context, req *pb.ReplyMessage) (*emptypb.Empty, error) {
 	if s.onReply == nil {
 		return nil, ErrCallbackNotSet
 	}
 
-	return s.onReply(context.Background(), nil)
+	return s.onReply(ctx, req)
 }
 
 // Terminate implements rpc.HSServiceServer.
-func (s *Server) Terminate(context.Context, *pb.TerminateMessage) (*pb.HSResponse, error) {
+func (s *Server) Terminate(ctx context.Context, req *pb.TerminateMessage) (*emptypb.Empty, error) {
 	if s.onTerminate == nil {
 		return nil, ErrCallbackNotSet
 	}
 
-	return s.onTerminate(context.Background(), nil)
+	return s.onTerminate(ctx, req)
 }
 
 // Ping implements rpc.LCRServiceServer.

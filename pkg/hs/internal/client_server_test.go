@@ -5,22 +5,22 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"leadelection/pkg/hs/internal/client"
+	pb "leadelection/pkg/hs/internal/rpc"
+	"leadelection/pkg/hs/internal/server"
 	"leadelection/pkg/internal"
-	"leadelection/pkg/lcr/internal/client"
-	"leadelection/pkg/lcr/internal/rpc"
-	"leadelection/pkg/lcr/internal/server"
+	globalInternal "leadelection/pkg/internal"
 	"os"
 	"strings"
 	"testing"
 	"time"
-
-	globalInternal "leadelection/pkg/internal"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestClientServer(t *testing.T) {
@@ -34,17 +34,17 @@ func TestClientServer(t *testing.T) {
 	c, err := client.New(listen, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err)
 
-	s.OnMessage(func(_ context.Context, _ *rpc.LCRMessage) (*rpc.LCRResponse, error) {
-		fmt.Println("message called")
-		return &rpc.LCRResponse{
-			Status: rpc.Status_RECEIVED,
-		}, nil
+	s.OnProbe(func(ctx context.Context, pm *pb.ProbeMessage) (*emptypb.Empty, error) {
+		require.NotNil(t, pm)
+		return &emptypb.Empty{}, nil
 	})
-	s.OnNotifyTermination(func(ctx context.Context, l *rpc.LCRMessage) (*rpc.LCRResponse, error) {
-		fmt.Println("termination called")
-		return &rpc.LCRResponse{
-			Status: rpc.Status_RECEIVED,
-		}, nil
+	s.OnReply(func(ctx context.Context, rm *pb.ReplyMessage) (*emptypb.Empty, error) {
+		require.NotNil(t, rm)
+		return &emptypb.Empty{}, nil
+	})
+	s.OnTerminate(func(ctx context.Context, tm *pb.TerminateMessage) (*emptypb.Empty, error) {
+		require.NotNil(t, tm)
+		return &emptypb.Empty{}, nil
 	})
 
 	defer s.Close()
@@ -63,12 +63,9 @@ func TestClientServer(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		require.NoError(t, c.Ping(context.Background()))
-		resp, err := c.Message(context.Background(), &rpc.LCRMessage{})
-		require.NoError(t, err)
-		require.Equal(t, rpc.Status_RECEIVED, resp.Status)
-		resp, err = c.NotifyTermination(context.Background(), &rpc.LCRMessage{})
-		require.NoError(t, err)
-		require.Equal(t, rpc.Status_RECEIVED, resp.Status)
+		require.NoError(t, c.Probe(context.Background(), &pb.ProbeMessage{}))
+		require.NoError(t, c.Reply(context.Background(), &pb.ReplyMessage{}))
+		require.NoError(t, c.Terminate(context.Background(), &pb.TerminateMessage{}))
 	}
 }
 
@@ -99,20 +96,20 @@ func TestClientServer_TLS(t *testing.T) {
 	c, err := client.New(listen, clientOpts)
 	require.NoError(t, err)
 
-	s.OnMessage(func(_ context.Context, _ *rpc.LCRMessage) (*rpc.LCRResponse, error) {
-		fmt.Println("message called")
-		return &rpc.LCRResponse{
-			Status: rpc.Status_RECEIVED,
-		}, nil
+	s.OnProbe(func(ctx context.Context, pm *pb.ProbeMessage) (*emptypb.Empty, error) {
+		require.NotNil(t, pm)
+		return &emptypb.Empty{}, nil
 	})
-	s.OnNotifyTermination(func(ctx context.Context, l *rpc.LCRMessage) (*rpc.LCRResponse, error) {
-		fmt.Println("termination called")
-		return &rpc.LCRResponse{
-			Status: rpc.Status_RECEIVED,
-		}, nil
+	s.OnReply(func(ctx context.Context, rm *pb.ReplyMessage) (*emptypb.Empty, error) {
+		require.NotNil(t, rm)
+		return &emptypb.Empty{}, nil
+	})
+	s.OnTerminate(func(ctx context.Context, tm *pb.TerminateMessage) (*emptypb.Empty, error) {
+		require.NotNil(t, tm)
+		return &emptypb.Empty{}, nil
 	})
 
-	t.Cleanup(s.Close)
+	defer s.Close()
 	go func() {
 		err := s.Start()
 		if err != nil && err != grpc.ErrServerStopped {
@@ -128,12 +125,9 @@ func TestClientServer_TLS(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		require.NoError(t, c.Ping(context.Background()))
-		resp, err := c.Message(context.Background(), &rpc.LCRMessage{})
-		require.NoError(t, err)
-		require.Equal(t, rpc.Status_RECEIVED, resp.Status)
-		resp, err = c.NotifyTermination(context.Background(), &rpc.LCRMessage{})
-		require.NoError(t, err)
-		require.Equal(t, rpc.Status_RECEIVED, resp.Status)
+		require.NoError(t, c.Probe(context.Background(), &pb.ProbeMessage{}))
+		require.NoError(t, c.Reply(context.Background(), &pb.ReplyMessage{}))
+		require.NoError(t, c.Terminate(context.Background(), &pb.TerminateMessage{}))
 	}
 }
 
@@ -193,21 +187,20 @@ func TestClientServer_MutualTLS(t *testing.T) {
 	c, err := client.New(listen, clientOpts)
 	require.NoError(t, err)
 
-	s.OnMessage(func(_ context.Context, _ *rpc.LCRMessage) (*rpc.LCRResponse, error) {
-		fmt.Println("message called")
-		return &rpc.LCRResponse{
-			Status: rpc.Status_RECEIVED,
-		}, nil
+	s.OnProbe(func(ctx context.Context, pm *pb.ProbeMessage) (*emptypb.Empty, error) {
+		require.NotNil(t, pm)
+		return &emptypb.Empty{}, nil
 	})
-	s.OnNotifyTermination(func(ctx context.Context, l *rpc.LCRMessage) (*rpc.LCRResponse, error) {
-		fmt.Println("termination called")
-		return &rpc.LCRResponse{
-			Status: rpc.Status_RECEIVED,
-		}, nil
+	s.OnReply(func(ctx context.Context, rm *pb.ReplyMessage) (*emptypb.Empty, error) {
+		require.NotNil(t, rm)
+		return &emptypb.Empty{}, nil
+	})
+	s.OnTerminate(func(ctx context.Context, tm *pb.TerminateMessage) (*emptypb.Empty, error) {
+		require.NotNil(t, tm)
+		return &emptypb.Empty{}, nil
 	})
 
-	t.Cleanup(s.Close)
-
+	defer s.Close()
 	go func() {
 		err := s.Start()
 		if err != nil && err != grpc.ErrServerStopped {
@@ -219,16 +212,13 @@ func TestClientServer_MutualTLS(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second)
 
 	for i := 0; i < 10; i++ {
 		require.NoError(t, c.Ping(context.Background()))
-		resp, err := c.Message(context.Background(), &rpc.LCRMessage{})
-		require.NoError(t, err)
-		require.Equal(t, rpc.Status_RECEIVED, resp.Status)
-		resp, err = c.NotifyTermination(context.Background(), &rpc.LCRMessage{})
-		require.NoError(t, err)
-		require.Equal(t, rpc.Status_RECEIVED, resp.Status)
+		require.NoError(t, c.Probe(context.Background(), &pb.ProbeMessage{}))
+		require.NoError(t, c.Reply(context.Background(), &pb.ReplyMessage{}))
+		require.NoError(t, c.Terminate(context.Background(), &pb.TerminateMessage{}))
 	}
 }
 

@@ -3,7 +3,7 @@ package lcr
 import (
 	"context"
 	"errors"
-	"leadelection/pkg/lcr/internal"
+	"leadelection/pkg/internal"
 	"leadelection/pkg/lcr/internal/client"
 	pb "leadelection/pkg/lcr/internal/rpc"
 	"leadelection/pkg/lcr/internal/server"
@@ -39,7 +39,7 @@ type LeadElection struct {
 	stop                 chan struct{}
 	nodesMutex           sync.RWMutex
 	nodes                map[uint64]*client.Client
-	orderedNodeUIDs      internal.OrderedUIDList
+	orderedNodeUIDs      internal.OrderedList[uint64]
 	neighborNodeIndex    int
 	leader               *uint64
 }
@@ -57,7 +57,7 @@ func New(uid uint64, listen string, logger log.ILogger, opt ...grpc.ServerOption
 		logger:          logger,
 		server:          s,
 		stop:            make(chan struct{}),
-		orderedNodeUIDs: internal.OrderedUIDList{uid},
+		orderedNodeUIDs: internal.OrderedList[uint64]{uid},
 		nodes:           map[uint64]*client.Client{uid: nil},
 	}
 
@@ -135,7 +135,7 @@ func (le *LeadElection) Stop() {
 	}
 
 	le.stop = make(chan struct{})
-	le.orderedNodeUIDs = internal.OrderedUIDList{le.uid}
+	le.orderedNodeUIDs = internal.OrderedList[uint64]{le.uid}
 	le.nodes = map[uint64]*client.Client{le.uid: nil}
 	le.performElectionMutex = sync.Mutex{}
 }
@@ -162,7 +162,7 @@ func (le *LeadElection) AddNode(uid uint64, addr string, opts ...grpc.DialOption
 
 	le.nodes[uid] = cl
 	le.orderedNodeUIDs.AddOrdered(uid)
-	if neighborIndex := le.orderedNodeUIDs.FindNeighbor(le.uid); neighborIndex != nil {
+	if neighborIndex := le.orderedNodeUIDs.GetIndexLeftOfValue(le.uid); neighborIndex != nil {
 		le.neighborNodeIndex = *neighborIndex
 	} else {
 		panic("could not find self in ordered list, this is an internal bug, please open an issue at https://github.com/StevenCyb/go_lead_election/issues.")
@@ -183,7 +183,7 @@ func (le *LeadElection) RemoveNode(uid uint64) error {
 
 	delete(le.nodes, uid)
 	le.orderedNodeUIDs.RemoveOrdered(uid)
-	if neighborIndex := le.orderedNodeUIDs.FindNeighbor(le.uid); neighborIndex != nil {
+	if neighborIndex := le.orderedNodeUIDs.GetIndexLeftOfValue(le.uid); neighborIndex != nil {
 		le.neighborNodeIndex = *neighborIndex
 	} else {
 		panic("could not find self in ordered list, this is an internal bug, please open an issue at https://github.com/StevenCyb/go_lead_election/issues.")
@@ -291,7 +291,7 @@ func (le *LeadElection) sendTermination(req *pb.LCRMessage) *pb.LCRResponse {
 	defer le.nodesMutex.RUnlock()
 
 	index := le.neighborNodeIndex
-	sendTo := le.orderedNodeUIDs.GetNext(index)
+	sendTo := le.orderedNodeUIDs.GetValueForIndexLoopedReverted(index)
 
 	for {
 		node := le.nodes[sendTo]
@@ -306,7 +306,7 @@ func (le *LeadElection) sendTermination(req *pb.LCRMessage) *pb.LCRResponse {
 			le.logger.Tracef("Error termination sending message[%s] to %d: %v", req.MessageId, sendTo, err)
 			cancel()
 			index++
-			sendTo = le.orderedNodeUIDs.GetNext(index)
+			sendTo = le.orderedNodeUIDs.GetValueForIndexLoopedReverted(index)
 		} else {
 			cancel()
 			return resp
@@ -323,7 +323,7 @@ func (le *LeadElection) sendMessage(req *pb.LCRMessage) *pb.LCRResponse {
 		le.onLeaderChangeFunc(le.leader)
 	}
 	index := le.neighborNodeIndex
-	sendTo := le.orderedNodeUIDs.GetNext(index)
+	sendTo := le.orderedNodeUIDs.GetValueForIndexLoopedReverted(index)
 
 	for {
 		node := le.nodes[sendTo]
@@ -338,7 +338,7 @@ func (le *LeadElection) sendMessage(req *pb.LCRMessage) *pb.LCRResponse {
 			le.logger.Tracef("Error sending message[%s] to %d: %v", req.MessageId, sendTo, err)
 			cancel()
 			index++
-			sendTo = le.orderedNodeUIDs.GetNext(index)
+			sendTo = le.orderedNodeUIDs.GetValueForIndexLoopedReverted(index)
 		} else {
 			cancel()
 			return resp

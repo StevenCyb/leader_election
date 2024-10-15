@@ -12,4 +12,6 @@ On you service setup the HS service like this:
 TODO
 ```
 
-* HS https://www.cs.utexas.edu/~lorenzo/corsi/cs380d/past/03F/notes/9-6.pdf
+It is recommended to use TLS or even better mutual TLS to secure the communication. 
+This can be configured using the `grpc.DialOption`. 
+A simple example for that is show in the unit tests (`TestClientServer_TLS` and `TestClientServer_MutualTLS`) [here](internal/client_server_test.go).
