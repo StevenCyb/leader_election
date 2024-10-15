@@ -12,6 +12,7 @@ All processes mark themselves as non-participants and acknowledge the leader.
 On you service setup the LCR service like this:
 ```go
 TODO
+* CR https://en.wikipedia.org/wiki/Chang_and_Roberts_algorithm
 ```
 
 It is recommended to use TLS or even better mutual TLS to secure the communication. 
