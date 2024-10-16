@@ -16,4 +16,3 @@ secure network
 * Bully https://en.wikipedia.org/wiki/Bully_algorithm
 * Paxos
 * Raft
-* BRD-BLE (Balanced Replica Distribution-Based Leader Election)
