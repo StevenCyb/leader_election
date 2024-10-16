@@ -11,8 +11,30 @@ All processes mark themselves as non-participants and acknowledge the leader.
 ## Usage
 On you service setup the LCR service like this:
 ```go
-TODO
-* CR https://en.wikipedia.org/wiki/Chang_and_Roberts_algorithm
+uid, err := strconv.ParseUint(os.Getenv("LB_ID"), 10, 64)
+// ...
+logger := log.New().Build()
+instance, err := New(uid, listen, logger)
+// ...
+// Add all other nodes from the cluster with there id and listen address
+instance.AddNode(id, listen, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// ...
+// Start the leader service
+instance.MustStart(delayDuration, checkIntervalDuration)
+// ...
+// Optionally register for leader change event if needed
+instance.OnLeaderChange(func(leader *uint64) {
+	if leader != nil {
+    // Got new leader
+	}
+})
+// Get the leader
+leader := instance.GetLeader()
+// Check if is leader 
+if instance.IsLeader() {
+  // ...
+}
+// ...
 ```
 
 It is recommended to use TLS or even better mutual TLS to secure the communication. 

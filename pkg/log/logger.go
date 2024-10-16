@@ -109,7 +109,7 @@ func (l *Logger) Trace(msg string, field ...IFlied) {
 
 func (l *Logger) log(level LogLevel, msg string, field ...IFlied) {
 	if l.settings.format == FORMAT_TEXT {
-		out := fmt.Sprintf("%s\t%s\t", time.Now().Format("2006-01-02T15:04:05"), level.String())
+		out := fmt.Sprintf("%s\t%s:\t", time.Now().Format("2006-01-02T15:04:05"), level.String())
 
 		if l.settings.name != nil {
 			out = out + *l.settings.name + "\t"

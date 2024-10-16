@@ -33,7 +33,7 @@ func (c *ClusterTester) AddInstance(id uint64) {
 
 	port := internal.GetFreeLocalPort(c.t)
 	listen := fmt.Sprintf("localhost:%d", port)
-	logger := log.New().SetName(fmt.Sprintf("I%d", id)).SetLogLevel(log.LEVEL_TRACE).Build()
+	logger := log.New().SetName(fmt.Sprintf("I%d", id)).Build()
 	newInstance, err := New(id, listen, logger)
 	require.NoError(c.t, err)
 
@@ -85,6 +85,19 @@ func (c *ClusterTester) Kill(id uint64) {
 
 	instance.Stop()
 	delete(c.instances, id)
+}
+
+func TestLeadElection_HS_Single(t *testing.T) {
+	t.Parallel()
+
+	ct := ClusterTester{
+		t:         t,
+		instances: make(map[uint64]*LeadElection),
+	}
+	t.Cleanup(ct.Cleanup)
+
+	ct.AddInstance(10)
+	ct.ExpectLeader(time.Second, 10)
 }
 
 func TestLeadElection_HS_Simple(t *testing.T) {

@@ -1,20 +1,19 @@
-package lcr
+package cr
 
 import (
 	"context"
 	"errors"
+	"leadelection/pkg/cr/internal/client"
+	pb "leadelection/pkg/cr/internal/rpc"
+	"leadelection/pkg/cr/internal/server"
 	"leadelection/pkg/internal"
-	"leadelection/pkg/lcr/internal/client"
-	pb "leadelection/pkg/lcr/internal/rpc"
-	"leadelection/pkg/lcr/internal/server"
 	"leadelection/pkg/log"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 var ErrNodeAlreadyExists = errors.New("node already exists")
@@ -26,6 +25,14 @@ var ErrNonTLSNode = errors.New("node is not TLS, use AddNode instead")
 // OnLeaderChangeFunc is a callback function that is called when the leader changes.
 type OnLeaderChangeFunc func(leader *uint64)
 
+type Stage byte
+
+const (
+	Idle Stage = iota
+	Election
+	LeaderAnnouncement
+)
+
 // LeadElection represents the LeLann-Chang-Roberts (LCR) algorithm for leader election.
 type LeadElection struct {
 	// Unchanged fields
@@ -35,13 +42,15 @@ type LeadElection struct {
 	onLeaderChangeFunc OnLeaderChangeFunc
 	logger             log.ILogger
 	// Dynamic fields
-	performElectionMutex sync.Mutex
-	stop                 chan struct{}
-	nodesMutex           sync.RWMutex
-	nodes                map[uint64]*client.Client
-	orderedNodeUIDs      internal.OrderedList[uint64]
-	neighborNodeIndex    int
-	leader               *uint64
+	stageMutex        sync.Mutex
+	stage             Stage
+	participant       bool
+	stop              chan struct{}
+	nodesMutex        sync.RWMutex
+	nodes             map[uint64]*client.Client
+	orderedNodeUIDs   internal.OrderedList[uint64]
+	neighborNodeIndex int
+	leader            *uint64
 }
 
 // New creates a new LeadElection instance.
@@ -56,13 +65,14 @@ func New(uid uint64, listen string, logger log.ILogger, opt ...grpc.ServerOption
 		listen:          listen,
 		logger:          logger,
 		server:          s,
+		stage:           Idle,
 		stop:            make(chan struct{}),
 		orderedNodeUIDs: internal.OrderedList[uint64]{uid},
 		nodes:           map[uint64]*client.Client{uid: nil},
 	}
 
-	s.OnNotifyTermination(le.onTermination)
-	s.OnMessage(le.onMessage)
+	s.OnElection(le.onElection)
+	s.OnElected(le.onElected)
 
 	return le, nil
 }
@@ -73,6 +83,7 @@ func (le *LeadElection) MustStart(delay time.Duration, checkInterval time.Durati
 	le.logger.Info("Start leader election service")
 	go func() {
 		err := le.server.Start()
+		le.logger.Trace("Server stopped")
 		if err != nil && err != grpc.ErrServerStopped {
 			if strings.Contains(err.Error(), "use of closed network connection") {
 				// Ignore this error
@@ -134,10 +145,12 @@ func (le *LeadElection) Stop() {
 		}
 	}
 
+	le.stage = Idle
+	le.participant = false
 	le.stop = make(chan struct{})
 	le.orderedNodeUIDs = internal.OrderedList[uint64]{le.uid}
 	le.nodes = map[uint64]*client.Client{le.uid: nil}
-	le.performElectionMutex = sync.Mutex{}
+	le.stageMutex = sync.Mutex{}
 }
 
 // OnLeaderChange sets the callback function that is called when the leader changes.
@@ -162,7 +175,7 @@ func (le *LeadElection) AddNode(uid uint64, addr string, opts ...grpc.DialOption
 
 	le.nodes[uid] = cl
 	le.orderedNodeUIDs.AddOrdered(uid)
-	if neighborIndex := le.orderedNodeUIDs.GetIndexLeftOfValue(le.uid); neighborIndex != nil {
+	if neighborIndex := le.orderedNodeUIDs.GetIndexRightOfValue(le.uid); neighborIndex != nil {
 		le.neighborNodeIndex = *neighborIndex
 	} else {
 		panic("could not find self in ordered list, this is an internal bug, please open an issue at https://github.com/StevenCyb/go_lead_election/issues.")
@@ -203,145 +216,130 @@ func (le *LeadElection) GetLeader() *uint64 {
 	return le.leader
 }
 
-func (le *LeadElection) onMessage(_ context.Context, req *pb.LCRMessage) (*pb.LCRResponse, error) {
-	le.logger.Tracef("Got message[%s] for leader %d", req.MessageId, req.Uid)
-	if req.Uid == le.uid {
-		le.logger.Tracef("Received message[%s] from self within %s, terminate with self as leader", req.MessageId, time.Since(req.StartTime.AsTime()).String())
-		if resp := le.sendTermination(req); resp != nil && resp.Status == pb.Status_DISCARDED {
-			return &pb.LCRResponse{Status: pb.Status_DISCARDED, MessageId: req.MessageId}, nil
-		}
-
-		return &pb.LCRResponse{Status: pb.Status_RECEIVED, MessageId: req.MessageId}, nil
+func (le *LeadElection) startElection() {
+	if !le.stageMutex.TryLock() {
+		return
 	}
+	defer le.stageMutex.Unlock()
+
+	if le.stage != Idle || le.participant {
+		return
+	}
+
+	le.logger.Info("Start election")
+
+	le.participant = true
+	le.stage = Election
+	msg := &pb.Message{Uid: le.uid}
+
+	go le.sendElection(msg)
+}
+
+func (le *LeadElection) onElection(ctx context.Context, req *pb.Message) (*emptypb.Empty, error) {
+	le.logger.Debugf("Received election message with leader %d", req.Uid)
+	le.stageMutex.Lock()
+	defer le.stageMutex.Unlock()
 
 	if req.Uid > le.uid {
-		le.logger.Tracef("Propagate message[%s] for leader candidate %d", req.MessageId, req.Uid)
-		if resp := le.sendMessage(req); resp != nil && resp.Status == pb.Status_DISCARDED {
-			le.logger.Tracef("Discard message[%s] for leader due neighbor discarded candidate %d", req.MessageId, req.Uid)
-
-			return &pb.LCRResponse{Status: pb.Status_DISCARDED, MessageId: req.MessageId}, nil
-		}
-
-		return &pb.LCRResponse{Status: pb.Status_RECEIVED, MessageId: req.MessageId}, nil
-	}
-
-	// req.Uid < le.uid
-	// Replace the ID with the highest one and propagate
-	le.logger.Tracef("Received lower ID %d, replacing with own ID %d and propagating", req.Uid, le.uid)
-	req.Uid = le.uid
-	if resp := le.sendMessage(req); resp != nil && resp.Status == pb.Status_DISCARDED {
-		le.logger.Tracef("Discard message[%s] for leader due neighbor discarded candidate %d", req.MessageId, req.Uid)
-		return &pb.LCRResponse{Status: pb.Status_DISCARDED, MessageId: req.MessageId}, nil
-	}
-
-	return &pb.LCRResponse{Status: pb.Status_RECEIVED, MessageId: req.MessageId}, nil
-}
-
-func (le *LeadElection) onTermination(_ context.Context, req *pb.LCRMessage) (*pb.LCRResponse, error) {
-	le.logger.Tracef("Got termination message[%s] for leader %d", req.MessageId, req.Uid)
-	if req.Uid == le.uid {
-		le.logger.Debugf("Terminate by message[%s] with self (%d) as leader after %s", req.MessageId, le.uid, time.Since(req.StartTime.AsTime()).String())
+		le.participant = true
+		le.logger.Tracef("Forward election message to next node with leader %d", req.Uid)
+		go le.sendElection(req)
+	} else if req.Uid < le.uid && !le.participant {
+		le.logger.Tracef("Forward election message to next node with replaced leader %d->%d", req.Uid, le.uid)
+		le.participant = true
+		go le.sendElection(&pb.Message{Uid: le.uid})
+	} else if req.Uid == le.uid {
+		// own election message
+		le.logger.Tracef("Own election message, start leader announcement")
+		le.stage = LeaderAnnouncement
 		le.leader = &req.Uid
-		if le.onLeaderChangeFunc != nil {
-			le.onLeaderChangeFunc(le.leader)
-		}
-
-		return &pb.LCRResponse{Status: pb.Status_RECEIVED, MessageId: req.MessageId}, nil
+		go le.sendElected(req)
+	} else {
+		le.logger.Tracef("Ignore election message with leader %d", req.Uid)
 	}
 
-	le.logger.Tracef("Propagate termination message[%s] for leader %d", req.MessageId, req.Uid)
+	return &emptypb.Empty{}, nil
+}
 
-	if le.leader == nil || *le.leader != req.Uid {
+func (le *LeadElection) onElected(ctx context.Context, req *pb.Message) (*emptypb.Empty, error) {
+	le.logger.Debugf("Received elected message with leader %d", req.Uid)
+	le.stageMutex.Lock()
+	defer le.stageMutex.Unlock()
+
+	le.participant = false
+	le.stage = Idle
+
+	if req.Uid != le.uid {
+		le.logger.Tracef("Forward elected message to next node with leader %d", req.Uid)
 		le.leader = &req.Uid
-		if le.onLeaderChangeFunc != nil {
-			le.onLeaderChangeFunc(le.leader)
-		}
-		le.logger.Infof("New leader is %d", req.Uid)
+		go le.sendElected(req)
 	}
 
-	if resp := le.sendTermination(req); resp != nil && resp.Status == pb.Status_DISCARDED {
-		return &pb.LCRResponse{Status: pb.Status_DISCARDED, MessageId: req.MessageId}, nil
-	}
-
-	return &pb.LCRResponse{Status: pb.Status_RECEIVED, MessageId: req.MessageId}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (le *LeadElection) startElection() {
-	if !le.performElectionMutex.TryLock() {
-		return
-	}
-
-	req := &pb.LCRMessage{Uid: le.uid, StartTime: timestamppb.New(time.Now()), MessageId: uuid.New().String()}
-	le.logger.Infof("Starting election with leader %v on message[%s]  current leader = nil", le.uid, req.MessageId)
-	if resp := le.sendMessage(req); resp != nil && resp.Status == pb.Status_DISCARDED {
-		le.logger.Tracef("Election discarded for leader %v on message[%s] after %s", le.uid, req.MessageId, time.Since(req.StartTime.AsTime()).String())
-		le.performElectionMutex.Unlock()
-
-		return
-	} else if resp == nil {
-		le.logger.Infof("Election accepted for self leader %v on message[%s] after %s", le.uid, req.MessageId, time.Since(req.StartTime.AsTime()).String())
-		le.leader = &le.uid
-	}
-
-	le.performElectionMutex.Unlock()
-}
-
-func (le *LeadElection) sendTermination(req *pb.LCRMessage) *pb.LCRResponse {
+func (le *LeadElection) sendElection(req *pb.Message) {
 	le.nodesMutex.RLock()
 	defer le.nodesMutex.RUnlock()
 
 	index := le.neighborNodeIndex
-	sendTo := le.orderedNodeUIDs.GetValueForIndexLoopedReverted(index)
+	sendTo := le.orderedNodeUIDs.GetValueForIndexLooped(index)
 
 	for {
 		node := le.nodes[sendTo]
 		if node == nil {
-			le.logger.Tracef("Reached himself on message[%s], no one else left", req.MessageId)
-			return nil
+			break
 		}
 
-		le.logger.Tracef("Send termination message[%s] with leader %d to %d", req.MessageId, req.Uid, sendTo)
+		le.logger.Tracef("Send election message with leader %d to %d", req.Uid, sendTo)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		if resp, err := node.NotifyTermination(ctx, req); err != nil {
-			le.logger.Tracef("Error termination sending message[%s] to %d: %v", req.MessageId, sendTo, err)
+		if _, err := node.Election(ctx, req); err != nil {
+			le.logger.Tracef("Error sending election message to %d: %v", sendTo, err)
 			cancel()
 			index++
-			sendTo = le.orderedNodeUIDs.GetValueForIndexLoopedReverted(index)
+			sendTo = le.orderedNodeUIDs.GetValueForIndexLooped(index)
 		} else {
 			cancel()
-			return resp
+			le.logger.Tracef("Election message sent to %d", sendTo)
+			return
 		}
 	}
+
+	le.logger.Trace("Reached himself on sending election")
+
+	//nolint:errcheck
+	go le.onElection(context.Background(), req)
 }
 
-func (le *LeadElection) sendMessage(req *pb.LCRMessage) *pb.LCRResponse {
+func (le *LeadElection) sendElected(req *pb.Message) {
 	le.nodesMutex.RLock()
 	defer le.nodesMutex.RUnlock()
 
-	le.leader = nil
-	if le.onLeaderChangeFunc != nil {
-		le.onLeaderChangeFunc(le.leader)
-	}
 	index := le.neighborNodeIndex
-	sendTo := le.orderedNodeUIDs.GetValueForIndexLoopedReverted(index)
+	sendTo := le.orderedNodeUIDs.GetValueForIndexLooped(index)
 
 	for {
 		node := le.nodes[sendTo]
 		if node == nil {
-			le.logger.Tracef("Reached himself on termination message[%s], no one else left", req.MessageId)
-			return nil
+			break
 		}
 
-		le.logger.Tracef("Send message[%s] with leader %d to %d", req.MessageId, req.Uid, sendTo)
+		le.logger.Tracef("Send elected announcement message with leader %d to %d", req.Uid, sendTo)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		if resp, err := node.Message(ctx, req); err != nil {
-			le.logger.Tracef("Error sending message[%s] to %d: %v", req.MessageId, sendTo, err)
+		if _, err := node.Elected(ctx, req); err != nil {
+			le.logger.Tracef("Error sending elected announcement message to %d: %v", sendTo, err)
 			cancel()
 			index++
-			sendTo = le.orderedNodeUIDs.GetValueForIndexLoopedReverted(index)
+			sendTo = le.orderedNodeUIDs.GetValueForIndexLooped(index)
 		} else {
 			cancel()
-			return resp
+			le.logger.Tracef("Elected announcement message sent to %d", sendTo)
+			return
 		}
 	}
+
+	le.logger.Trace("Reached himself on sending elected announcement")
+
+	//nolint:errcheck
+	go le.onElected(context.Background(), req)
 }

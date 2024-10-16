@@ -4,10 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	pb "leadelection/pkg/cr/internal/rpc"
 	"net"
 	"time"
-
-	pb "leadelection/pkg/cr/internal/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -82,21 +81,21 @@ func (s *Server) OnElection(callback ElectionFunc) {
 }
 
 // Elected implements rpc.CRServiceServer.
-func (s *Server) Elected(context.Context, *pb.Message) (*emptypb.Empty, error) {
+func (s *Server) Elected(ctx context.Context, req *pb.Message) (*emptypb.Empty, error) {
 	if s.onElected == nil {
 		return nil, ErrCallbackNotSet
 	}
 
-	return s.onElected(context.Background(), nil)
+	return s.onElected(ctx, req)
 }
 
 // Election implements rpc.CRServiceServer.
-func (s *Server) Election(context.Context, *pb.Message) (*emptypb.Empty, error) {
+func (s *Server) Election(ctx context.Context, req *pb.Message) (*emptypb.Empty, error) {
 	if s.onElection == nil {
 		return nil, ErrCallbackNotSet
 	}
 
-	return s.onElection(context.Background(), nil)
+	return s.onElection(ctx, req)
 }
 
 // Ping implements rpc.LCRServiceServer.

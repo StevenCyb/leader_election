@@ -1,4 +1,4 @@
-package lcr
+package cr
 
 import (
 	"fmt"
@@ -83,7 +83,7 @@ func (c *ClusterTester) Revive(id uint64) {
 		require.NoError(c.t, newInstance.AddNode(instance.uid, instance.listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 	}
 
-	newInstance.MustStart(time.Millisecond*500, time.Millisecond*100)
+	newInstance.MustStart(time.Millisecond*300, time.Millisecond*100)
 
 	c.instances[id] = newInstance
 }
@@ -102,7 +102,7 @@ func (c *ClusterTester) ExpectLeader(delay time.Duration, expect uint64) {
 	}
 }
 
-func TestLeadElection_LCR_Single(t *testing.T) {
+func TestLeadElection_CR_Single(t *testing.T) {
 	t.Parallel()
 
 	ct := ClusterTester{
@@ -116,7 +116,7 @@ func TestLeadElection_LCR_Single(t *testing.T) {
 	ct.ExpectLeader(time.Second, 10)
 }
 
-func TestLeadElection_LCR_Simple(t *testing.T) {
+func TestLeadElection_CR_Simple(t *testing.T) {
 	t.Parallel()
 
 	ct := ClusterTester{
@@ -129,13 +129,13 @@ func TestLeadElection_LCR_Simple(t *testing.T) {
 	ct.AddInstance(10)
 	ct.ExpectLeader(time.Second, 10)
 	ct.AddInstance(20)
-	ct.ExpectLeader(time.Second*2, 20)
+	ct.ExpectLeader(time.Second, 20)
 	ct.AddInstance(15)
 	ct.AddInstance(5)
 	ct.ExpectLeader(time.Second*2, 20)
 }
 
-func TestLeadElection_LCR_DeadLeader(t *testing.T) {
+func TestLeadElection_CR_DeadLeader(t *testing.T) {
 	t.Parallel()
 
 	ct := ClusterTester{
@@ -148,12 +148,12 @@ func TestLeadElection_LCR_DeadLeader(t *testing.T) {
 	ct.AddInstance(10)
 	ct.AddInstance(20)
 	ct.AddInstance(30)
-	ct.ExpectLeader(time.Second*2, 30)
+	ct.ExpectLeader(time.Second, 30)
 	ct.Kill(30)
 	ct.ExpectLeader(time.Second*2, 20)
 }
 
-func TestLeadElection_LCR_DeadLeader_Revived(t *testing.T) {
+func TestLeadElection_CR_DeadLeader_Revived(t *testing.T) {
 	t.Parallel()
 
 	ct := ClusterTester{

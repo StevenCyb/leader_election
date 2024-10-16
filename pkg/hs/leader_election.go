@@ -117,7 +117,7 @@ func (le *LeadElection) MustStart(delay time.Duration, checkInterval time.Durati
 					panic(fmt.Errorf("leader %d not found in neighbors", *le.leaderUID))
 				}
 
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 				if err := leaderClient.Ping(ctx); err != nil {
 					le.logger.Infof("Leader %d is not reachable", *le.leaderUID)
 					le.neighborsMutex.RUnlock()
@@ -221,7 +221,7 @@ func (le *LeadElection) GetLeader() *uint64 {
 }
 
 func (le *LeadElection) startElection() {
-	if ok := le.performElectionMutex.TryLock(); !ok {
+	if !le.performElectionMutex.TryLock() {
 		return
 	}
 
@@ -407,7 +407,7 @@ func (le *LeadElection) onTerminate(_ context.Context, req *pb.TerminateMessage)
 
 func (le *LeadElection) sendProbe(probeMsg *pb.ProbeMessage, neighbors []internal.Tuple[uint64, *client.Client], reverted bool) {
 	sendFkt := func(uid uint64, probeMsg *pb.ProbeMessage, cl *client.Client) bool {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		if err := cl.Probe(ctx, probeMsg); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				le.logger.Warningf("Timeout sending probe to node %d, continuing with next", uid)
@@ -453,7 +453,7 @@ func (le *LeadElection) sendProbe(probeMsg *pb.ProbeMessage, neighbors []interna
 
 func (le *LeadElection) sendReply(replyMsg *pb.ReplyMessage, neighbors []internal.Tuple[uint64, *client.Client], reverted bool) {
 	sendFkt := func(uid uint64, replyMsg *pb.ReplyMessage, cl *client.Client) bool {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		if err := cl.Reply(ctx, replyMsg); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				le.logger.Warningf("Timeout sending reply to node %d, continuing with next", uid)
@@ -494,7 +494,7 @@ func (le *LeadElection) sendReply(replyMsg *pb.ReplyMessage, neighbors []interna
 
 func (le *LeadElection) sendTermination(terminateMsg *pb.TerminateMessage, neighbors []internal.Tuple[uint64, *client.Client], reverted bool) {
 	sendFkt := func(uid uint64, terminateMsg *pb.TerminateMessage, cl *client.Client) bool {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		if err := cl.Terminate(ctx, terminateMsg); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				le.logger.Warningf("Timeout sending termination to node %d, continuing with next", uid)
