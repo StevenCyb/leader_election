@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package bully;
+
+option go_package = "pkg/bully/internal/rpc";
+
+// Message to be sent to announce the election.
+message LeaderAnnouncementMessage {
+  uint64 uid = 1;
+}
+
+// The bully service definition.
+service BullyService {
+  // Elect RPC to check if the node is alive.
+  rpc Elect(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  // LeaderAnnouncement RPC to announce the leader.
+  rpc LeaderAnnouncement(LeaderAnnouncementMessage) returns (google.protobuf.Empty);
+}
