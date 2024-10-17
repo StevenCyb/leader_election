@@ -18,4 +18,7 @@ service BullyService {
 
   // LeaderAnnouncement RPC to announce the leader.
   rpc LeaderAnnouncement(LeaderAnnouncementMessage) returns (google.protobuf.Empty);
+  
+  // Ping RPC to check if the node is alive.
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
 }

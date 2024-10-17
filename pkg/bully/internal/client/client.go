@@ -57,3 +57,13 @@ func (c *Client) Elect(ctx context.Context) error {
 
 	return err
 }
+
+// Elect for sending to check if instance is alive and as for leadership.
+func (c *Client) Ping(ctx context.Context) error {
+	if c.grpcClient == nil {
+		return nil
+	}
+	_, err := c.grpcClient.Ping(ctx, &emptypb.Empty{})
+
+	return err
+}

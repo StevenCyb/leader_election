@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	BullyService_Elect_FullMethodName              = "/bully.BullyService/Elect"
 	BullyService_LeaderAnnouncement_FullMethodName = "/bully.BullyService/LeaderAnnouncement"
+	BullyService_Ping_FullMethodName               = "/bully.BullyService/Ping"
 )
 
 // BullyServiceClient is the client API for BullyService service.
@@ -34,6 +35,8 @@ type BullyServiceClient interface {
 	Elect(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// LeaderAnnouncement RPC to announce the leader.
 	LeaderAnnouncement(ctx context.Context, in *LeaderAnnouncementMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Ping RPC to check if the node is alive.
+	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type bullyServiceClient struct {
@@ -64,6 +67,16 @@ func (c *bullyServiceClient) LeaderAnnouncement(ctx context.Context, in *LeaderA
 	return out, nil
 }
 
+func (c *bullyServiceClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, BullyService_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BullyServiceServer is the server API for BullyService service.
 // All implementations must embed UnimplementedBullyServiceServer
 // for forward compatibility.
@@ -74,6 +87,8 @@ type BullyServiceServer interface {
 	Elect(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// LeaderAnnouncement RPC to announce the leader.
 	LeaderAnnouncement(context.Context, *LeaderAnnouncementMessage) (*emptypb.Empty, error)
+	// Ping RPC to check if the node is alive.
+	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	mustEmbedUnimplementedBullyServiceServer()
 }
 
@@ -89,6 +104,9 @@ func (UnimplementedBullyServiceServer) Elect(context.Context, *emptypb.Empty) (*
 }
 func (UnimplementedBullyServiceServer) LeaderAnnouncement(context.Context, *LeaderAnnouncementMessage) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LeaderAnnouncement not implemented")
+}
+func (UnimplementedBullyServiceServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedBullyServiceServer) mustEmbedUnimplementedBullyServiceServer() {}
 func (UnimplementedBullyServiceServer) testEmbeddedByValue()                      {}
@@ -147,6 +165,24 @@ func _BullyService_LeaderAnnouncement_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BullyService_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BullyServiceServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BullyService_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BullyServiceServer).Ping(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BullyService_ServiceDesc is the grpc.ServiceDesc for BullyService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -161,6 +197,10 @@ var BullyService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LeaderAnnouncement",
 			Handler:    _BullyService_LeaderAnnouncement_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _BullyService_Ping_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
