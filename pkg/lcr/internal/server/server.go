@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	pb "leadelection/pkg/lcr/internal/rpc"
+	pb "github.com/StevenCyb/leader_election/pkg/lcr/internal/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"

@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"leadelection/pkg/hs/internal/client"
-	"leadelection/pkg/hs/internal/server"
-	"leadelection/pkg/internal"
-	"leadelection/pkg/log"
 	"strings"
 	"sync"
 	"time"
 
-	pb "leadelection/pkg/hs/internal/rpc"
+	"github.com/StevenCyb/leader_election/pkg/hs/internal/client"
+	"github.com/StevenCyb/leader_election/pkg/hs/internal/server"
+	"github.com/StevenCyb/leader_election/pkg/internal"
+	"github.com/StevenCyb/leader_election/pkg/log"
+
+	pb "github.com/StevenCyb/leader_election/pkg/hs/internal/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"

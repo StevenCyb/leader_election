@@ -3,14 +3,15 @@ package cr
 import (
 	"context"
 	"errors"
-	"leadelection/pkg/cr/internal/client"
-	pb "leadelection/pkg/cr/internal/rpc"
-	"leadelection/pkg/cr/internal/server"
-	"leadelection/pkg/internal"
-	"leadelection/pkg/log"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/StevenCyb/leader_election/pkg/cr/internal/client"
+	pb "github.com/StevenCyb/leader_election/pkg/cr/internal/rpc"
+	"github.com/StevenCyb/leader_election/pkg/cr/internal/server"
+	"github.com/StevenCyb/leader_election/pkg/internal"
+	"github.com/StevenCyb/leader_election/pkg/log"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"

@@ -2,11 +2,12 @@ package hs
 
 import (
 	"fmt"
-	"leadelection/pkg/hs/internal/client"
-	"leadelection/pkg/internal"
-	"leadelection/pkg/log"
 	"testing"
 	"time"
+
+	"github.com/StevenCyb/leader_election/pkg/hs/internal/client"
+	"github.com/StevenCyb/leader_election/pkg/internal"
+	"github.com/StevenCyb/leader_election/pkg/log"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"

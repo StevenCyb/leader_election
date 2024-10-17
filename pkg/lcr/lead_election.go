@@ -3,14 +3,15 @@ package lcr
 import (
 	"context"
 	"errors"
-	"leadelection/pkg/internal"
-	"leadelection/pkg/lcr/internal/client"
-	pb "leadelection/pkg/lcr/internal/rpc"
-	"leadelection/pkg/lcr/internal/server"
-	"leadelection/pkg/log"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/StevenCyb/leader_election/pkg/internal"
+	"github.com/StevenCyb/leader_election/pkg/lcr/internal/client"
+	pb "github.com/StevenCyb/leader_election/pkg/lcr/internal/rpc"
+	"github.com/StevenCyb/leader_election/pkg/lcr/internal/server"
+	"github.com/StevenCyb/leader_election/pkg/log"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"

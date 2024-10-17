@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	pb "leadelection/pkg/cr/internal/rpc"
 	"net"
 	"time"
+
+	pb "github.com/StevenCyb/leader_election/pkg/cr/internal/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"

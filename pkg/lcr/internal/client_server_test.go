@@ -5,16 +5,17 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"leadelection/pkg/internal"
-	"leadelection/pkg/lcr/internal/client"
-	"leadelection/pkg/lcr/internal/rpc"
-	"leadelection/pkg/lcr/internal/server"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	globalInternal "leadelection/pkg/internal"
+	"github.com/StevenCyb/leader_election/pkg/internal"
+	"github.com/StevenCyb/leader_election/pkg/lcr/internal/client"
+	"github.com/StevenCyb/leader_election/pkg/lcr/internal/rpc"
+	"github.com/StevenCyb/leader_election/pkg/lcr/internal/server"
+
+	globalInternal "github.com/StevenCyb/leader_election/pkg/internal"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"

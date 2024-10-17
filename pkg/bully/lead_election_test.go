@@ -2,10 +2,11 @@ package bully
 
 import (
 	"fmt"
-	"leadelection/pkg/internal"
-	"leadelection/pkg/log"
 	"testing"
 	"time"
+
+	"github.com/StevenCyb/leader_election/pkg/internal"
+	"github.com/StevenCyb/leader_election/pkg/log"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -102,7 +103,7 @@ func (c *ClusterTester) ExpectLeader(delay time.Duration, expect uint64) {
 	}
 }
 
-func TestLeadElection_CR_Single(t *testing.T) {
+func TestLeadElection_Bully_Single(t *testing.T) {
 	t.Parallel()
 
 	ct := ClusterTester{
@@ -116,7 +117,7 @@ func TestLeadElection_CR_Single(t *testing.T) {
 	ct.ExpectLeader(time.Second, 10)
 }
 
-func TestLeadElection_CR_Simple(t *testing.T) {
+func TestLeadElection_Bully_Simple(t *testing.T) {
 	t.Parallel()
 
 	ct := ClusterTester{
@@ -135,7 +136,7 @@ func TestLeadElection_CR_Simple(t *testing.T) {
 	ct.ExpectLeader(time.Second*2, 20)
 }
 
-func TestLeadElection_CR_DeadLeader(t *testing.T) {
+func TestLeadElection_Bully_DeadLeader(t *testing.T) {
 	t.Parallel()
 
 	ct := ClusterTester{
@@ -154,7 +155,7 @@ func TestLeadElection_CR_DeadLeader(t *testing.T) {
 	ct.ExpectLeader(time.Second*2, 20)
 }
 
-func TestLeadElection_CR_DeadLeader_Revived(t *testing.T) {
+func TestLeadElection_Bully_DeadLeader_Revived(t *testing.T) {
 	t.Parallel()
 
 	ct := ClusterTester{

@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"leadelection/pkg/bully/internal/client"
-	pb "leadelection/pkg/bully/internal/rpc"
-	"leadelection/pkg/bully/internal/server"
-	"leadelection/pkg/log"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/StevenCyb/leader_election/pkg/bully/internal/client"
+	pb "github.com/StevenCyb/leader_election/pkg/bully/internal/rpc"
+	"github.com/StevenCyb/leader_election/pkg/bully/internal/server"
+	"github.com/StevenCyb/leader_election/pkg/log"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
