@@ -38,14 +38,12 @@ func (c *Client) Close() {
 }
 
 // RequestVote sends a vote request to the server.
-func (c *Client) RequestVote(ctx context.Context, req *pb.VoteMessage) error {
+func (c *Client) RequestVote(ctx context.Context, req *pb.VoteMessage) (*pb.VoteResponse, error) {
 	if c.grpcClient == nil {
-		return nil
+		return nil, nil
 	}
 
-	_, err := c.grpcClient.RequestVote(ctx, req)
-
-	return err
+	return c.grpcClient.RequestVote(ctx, req)
 }
 
 // Heartbeat sends a heartbeat to the server.

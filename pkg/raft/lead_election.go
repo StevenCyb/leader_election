@@ -5,11 +5,14 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/StevenCyb/leader_election/pkg/log"
+	"github.com/StevenCyb/leader_election/pkg/raft/internal"
 	"github.com/StevenCyb/leader_election/pkg/raft/internal/client"
 	pb "github.com/StevenCyb/leader_election/pkg/raft/internal/rpc"
 	"github.com/StevenCyb/leader_election/pkg/raft/internal/server"
+	"golang.org/x/exp/rand"
 	"google.golang.org/grpc"
 )
 
@@ -34,6 +37,7 @@ type LeadElection struct {
 	term               uint64
 	leaderUID          *uint64
 	votedFor           *uint64
+	timer              internal.Timer
 }
 
 // New creates a new LeadElection instance.
@@ -50,6 +54,7 @@ func New(uid uint64, listen string, logger log.ILogger, opt ...grpc.ServerOption
 		server: s,
 		stop:   make(chan struct{}),
 		nodes:  make(map[uint64]*client.Client),
+		timer:  internal.Timer{},
 	}
 
 	s.OnRequestVote(le.onRequestVote)
@@ -59,8 +64,9 @@ func New(uid uint64, listen string, logger log.ILogger, opt ...grpc.ServerOption
 }
 
 // MustStart starts the leader election or panics if server can not start.
-// New leader will be elected if current leader is unknown or unreachable within 5 seconds.
-func (le *LeadElection) MustStart() {
+// `heartbeatTimeout` is the interval between heartbeats and
+// the `electionTimeout` is random between 50ms-100ms + `heartbeatTimeout`.
+func (le *LeadElection) MustStart(heartbeatTimeout time.Duration) {
 	le.logger.Info("Start leader election service")
 	go func() {
 		err := le.server.Start()
@@ -73,13 +79,14 @@ func (le *LeadElection) MustStart() {
 		}
 	}()
 
-	go le.watchLeader()
+	go le.watchLeader(heartbeatTimeout)
 }
 
 // Stop stops the service.
 func (le *LeadElection) Stop() {
 	le.logger.Info("Stop leader election service")
 
+	le.timer.Stop()
 	close(le.stop)
 	le.server.Close()
 
@@ -97,6 +104,7 @@ func (le *LeadElection) Stop() {
 	le.leaderUID = nil
 	le.votedFor = nil
 	le.nodes = make(map[uint64]*client.Client)
+	le.timer = internal.Timer{}
 }
 
 // OnLeaderChange sets the callback function that is called when the leader changes.
@@ -157,11 +165,11 @@ func (le *LeadElection) onRequestVote(_ context.Context, req *pb.VoteMessage) (*
 	le.electionPhaseMutex.Lock()
 	defer le.electionPhaseMutex.Unlock()
 
-	if req.Term <= le.term {
+	if req.Term < le.term {
 		le.logger.Debugf("Reject vote request from %d on term %d, because term is old", req.Uid, req.Term)
 
 		resp := &pb.VoteResponse{
-			Term: le.term,
+			Term: 0,
 			Uid:  0,
 		}
 
@@ -170,14 +178,15 @@ func (le *LeadElection) onRequestVote(_ context.Context, req *pb.VoteMessage) (*
 		le.logger.Debugf("Reject vote request from %d on term %d, because already voted for %d", req.Uid, req.Term, *le.votedFor)
 
 		resp := &pb.VoteResponse{
-			Term: req.Term,
-			Uid:  *le.votedFor,
+			Term: 0,
+			Uid:  0,
 		}
 
 		return resp, nil
 	}
 
 	le.logger.Debugf("Vote for %d on term %d", req.Uid, req.Term)
+	le.timer.Stop()
 	le.votedFor = &req.Uid
 	resp := &pb.VoteResponse{
 		Term: req.Term,
@@ -194,24 +203,118 @@ func (le *LeadElection) onHeartbeat(_ context.Context, req *pb.HeartbeatMessage)
 	defer le.electionPhaseMutex.Unlock()
 
 	if req.Term > le.term {
-		le.logger.Debugf("Leader is now %d", req.Uid)
+		le.logger.Debugf("Elected leader %d on term %d", req.Uid, req.Term)
 		le.term = req.Term
 		le.leaderUID = &req.Uid
 		le.votedFor = nil
-		le.onLeaderChangeFunc(le.leaderUID)
+		le.timer.Reset()
+		if le.onLeaderChangeFunc != nil {
+			le.onLeaderChangeFunc(le.leaderUID)
+		}
+	} else if req.Term == le.term {
+		le.timer.Reset()
 	}
 
 	return nil
 }
 
-func (le *LeadElection) watchLeader() {
+func (le *LeadElection) watchLeader(heartbeatInterval time.Duration) {
 	le.logger.Debug("Start watching leader")
+	le.timer.Set(heartbeatInterval + time.Duration(rand.Intn(150+1))*time.Millisecond)
+	le.timer.OnTrigger(func() {
+		le.startElection(heartbeatInterval)
+	})
+	le.timer.Reset()
+
 	for {
 		select {
 		case <-le.stop:
 			return
 		default:
-			// TODO
+			le.nodesMutex.Lock()
+			le.electionPhaseMutex.Lock()
+			if le.leaderUID != nil && *le.leaderUID == le.uid {
+				le.electionPhaseMutex.Unlock()
+				for _, cl := range le.nodes {
+					//nolint:errcheck
+					go func(cl *client.Client) {
+						ctx, cancel := context.WithTimeout(context.Background(), heartbeatInterval)
+						defer cancel()
+
+						cl.Heartbeat(ctx, &pb.HeartbeatMessage{
+							Term: le.term,
+							Uid:  le.uid,
+						})
+					}(cl)
+				}
+			} else {
+				le.electionPhaseMutex.Unlock()
+			}
+			le.nodesMutex.Unlock()
+			time.Sleep(heartbeatInterval)
 		}
+	}
+}
+
+func (le *LeadElection) startElection(heartbeatTimeout time.Duration) {
+	le.electionPhaseMutex.Lock()
+	if le.votedFor != nil {
+		le.electionPhaseMutex.Unlock()
+		return
+	}
+	le.term++
+	le.votedFor = &le.uid
+	le.logger.Debugf("Start election with term %d", le.term)
+	le.electionPhaseMutex.Unlock()
+
+	le.nodesMutex.Lock()
+	majorityCount := len(le.nodes) / 2
+	if len(le.nodes)%2 != 0 {
+		majorityCount++
+	}
+	voteCount := 1
+	mu := sync.Mutex{}
+	wg := sync.WaitGroup{}
+	for uid, cl := range le.nodes {
+		wg.Add(1)
+		go func(cl *client.Client) {
+			le.logger.Tracef("Request vote from %d on term %d", uid, le.term)
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), heartbeatTimeout)
+			defer cancel()
+
+			req := &pb.VoteMessage{Uid: le.uid, Term: le.term}
+			if resp, err := cl.RequestVote(ctx, req); err == nil {
+				if resp.Uid == le.uid && resp.Term == le.term {
+					le.logger.Tracef("Received vote from %d on term %d", uid, le.term)
+					mu.Lock()
+					voteCount++
+					mu.Unlock()
+				} else {
+					le.logger.Tracef("Failed to vote from %d on term %d", uid, le.term)
+				}
+			} else {
+				le.logger.Tracef("Failed to request vote from %d on term %d: %v", uid, le.term, err)
+				mu.Lock()
+				voteCount++
+				mu.Unlock()
+			}
+		}(cl)
+	}
+	le.nodesMutex.Unlock()
+	wg.Wait()
+
+	if voteCount >= majorityCount {
+		le.logger.Debugf("Elected leader %d on term %d", le.uid, le.term)
+		le.electionPhaseMutex.Lock()
+		le.leaderUID = &le.uid
+		le.electionPhaseMutex.Unlock()
+		if le.onLeaderChangeFunc != nil {
+			le.onLeaderChangeFunc(le.leaderUID)
+		}
+	} else {
+		le.logger.Debugf("Failed to elect leader on term %d", le.term)
+		le.timer.Set(heartbeatTimeout + time.Duration(rand.Intn(150+1))*time.Millisecond)
+		le.timer.Reset()
 	}
 }
