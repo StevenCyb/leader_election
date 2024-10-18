@@ -276,6 +276,7 @@ func (le *LeadElection) startElection(heartbeatTimeout time.Duration) {
 	voteCount := 1
 	mu := sync.Mutex{}
 	wg := sync.WaitGroup{}
+
 	for uid, cl := range le.nodes {
 		wg.Add(1)
 		go func(cl *client.Client) {
@@ -302,6 +303,7 @@ func (le *LeadElection) startElection(heartbeatTimeout time.Duration) {
 			}
 		}(cl)
 	}
+
 	le.nodesMutex.Unlock()
 	wg.Wait()
 
