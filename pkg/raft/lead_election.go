@@ -27,13 +27,13 @@ type LeadElection struct {
 	onLeaderChangeFunc OnLeaderChangeFunc
 	logger             log.ILogger
 	// Dynamic fields
-	stop       chan struct{}
-	nodesMutex sync.RWMutex
-	nodes      map[uint64]*client.Client
-	// electionPhase sync.Mutex TODO
-	term      uint64
-	leaderUID *uint64
-	votedFor  *uint64
+	stop               chan struct{}
+	nodesMutex         sync.RWMutex
+	nodes              map[uint64]*client.Client
+	electionPhaseMutex sync.Mutex
+	term               uint64
+	leaderUID          *uint64
+	votedFor           *uint64
 }
 
 // New creates a new LeadElection instance.
@@ -85,6 +85,8 @@ func (le *LeadElection) Stop() {
 
 	le.nodesMutex.Lock()
 	defer le.nodesMutex.Unlock()
+	le.electionPhaseMutex.Lock()
+	defer le.electionPhaseMutex.Unlock()
 
 	for _, cl := range le.nodes {
 		cl.Close()
@@ -149,13 +151,47 @@ func (le *LeadElection) RemoveNode(uid uint64) error {
 	return nil
 }
 
-func (le *LeadElection) onRequestVote(context.Context, *pb.VoteMessage) (*pb.VoteResponse, error) {
-	// TODO
-	return nil, nil
+func (le *LeadElection) onRequestVote(_ context.Context, req *pb.VoteMessage) (*pb.VoteResponse, error) {
+	le.logger.Debugf("Received vote request from %d on term %d", req.Uid, req.Term)
+
+	le.electionPhaseMutex.Lock()
+	defer le.electionPhaseMutex.Unlock()
+
+	if req.Term <= le.term {
+		le.logger.Debugf("Reject vote request from %d on term %d, because term is old", req.Uid, req.Term)
+
+		resp := &pb.VoteResponse{
+			Term: le.term,
+			Uid:  0,
+		}
+
+		return resp, nil
+	} else if le.votedFor != nil {
+		le.logger.Debugf("Reject vote request from %d on term %d, because already voted for %d", req.Uid, req.Term, *le.votedFor)
+
+		resp := &pb.VoteResponse{
+			Term: req.Term,
+			Uid:  *le.votedFor,
+		}
+
+		return resp, nil
+	}
+
+	le.logger.Debugf("Vote for %d on term %d", req.Uid, req.Term)
+	le.votedFor = &req.Uid
+	resp := &pb.VoteResponse{
+		Term: req.Term,
+		Uid:  req.Uid,
+	}
+
+	return resp, nil
 }
 
 func (le *LeadElection) onHeartbeat(_ context.Context, req *pb.HeartbeatMessage) error {
 	le.logger.Debugf("Received heartbeat from %d on term %d", req.Uid, req.Term)
+
+	le.electionPhaseMutex.Lock()
+	defer le.electionPhaseMutex.Unlock()
 
 	if req.Term > le.term {
 		le.logger.Debugf("Leader is now %d", req.Uid)
