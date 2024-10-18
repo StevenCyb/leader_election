@@ -1,6 +1,4 @@
 # Bully
-## **DO NOT USE THIS: This implementation is not accurate to the algorithm. I will leave it here for now but this implementation might be recreated or removed later.**
-   
 The Bully algorithm is used for leader election in distributed systems. When a process detects the absence of a leader, it initiates an election by sending an election message to all processes with higher IDs. If no higher-ID process responds, the initiating process becomes the leader and announces its victory. If a higher-ID process responds, it takes over the election process. This continues until the process with the highest ID is elected as the leader and informs all other processes.
 
 ## Usage

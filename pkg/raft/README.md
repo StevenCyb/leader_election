@@ -1,26 +1,15 @@
-https://chelseatroy.com/2020/08/30/raft-10-leader-elections-part-1/
+# Raft
+The Raft algorithm is used for leader election in distributed systems. Each server starts as a follower. If a follower doesn’t receive a heartbeat from the leader within a timeout, it becomes a candidate and starts an election by requesting votes from other servers. Servers vote for the candidate with the most up-to-date log. If a candidate receives a majority of votes, it becomes the leader and sends heartbeats to maintain its authority. If no candidate wins, the process repeats. The leader manages log replication to ensure consistency across the cluster.
 
-https://raft.github.io/
+An visualization of this algorithm is provide on the [Raft Homepage](https://raft.github.io/) and a more precise explanation [here](https://thesecretlivesofdata.com/raft/).
 
+## Usage
+On you service setup the Raft service like this:
+```go
 
-Leader election with distributed consensus.
+```
 
-NODE:
-* Node A
-* Term: 1
-* Voted For: C
-
-Three states:
-* Follower
-* Candidate
-* Leader
-
-majority = totalNodes/2 <= totalRespondingNodes+deadNodes
-
-Two timeouts for leader election:
-* election timeout -> amount of time a follower waits until becoming a candidate (random between 150ms and 300ms)
-* heartbeat timeout -> 1 sec
-
+## TODO remove this later (notes)
 1) At start all nodes are follower
 2) First that finds no leader or that the leader is down, they become a candidate
 3) Leader election
