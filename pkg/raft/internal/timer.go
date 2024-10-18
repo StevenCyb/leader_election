@@ -36,7 +36,6 @@ func (t *Timer) Reset() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	// If the timer was stopped, allow it to restart
 	t.stopped = false
 
 	if t.timer != nil {
@@ -46,7 +45,7 @@ func (t *Timer) Reset() {
 	t.start()
 }
 
-// Stop stops the timer
+// Stop stops the timer.
 func (t *Timer) Stop() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
