@@ -12,7 +12,6 @@ import (
 	pb "github.com/StevenCyb/leader_election/pkg/bully/internal/rpc"
 	"github.com/StevenCyb/leader_election/pkg/bully/internal/server"
 	"github.com/StevenCyb/leader_election/pkg/log"
-
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -112,6 +111,17 @@ func (le *LeadElection) OnLeaderChange(f OnLeaderChangeFunc) {
 	le.onLeaderChangeFunc = f
 }
 
+// IsLeader returns if the current node is the leader.
+func (le *LeadElection) IsLeader() bool {
+	return le.leaderUID != nil && *le.leaderUID == le.uid
+}
+
+// GetLeaderSync returns the current leader's UID.
+// Might be nil if no leader known yet.
+func (le *LeadElection) GetLeader() *uint64 {
+	return le.leaderUID
+}
+
 // AddNode adds a new node to the cluster.
 func (le *LeadElection) AddNode(uid uint64, addr string, opts ...grpc.DialOption) error {
 	le.nodesMutex.Lock()
@@ -158,17 +168,6 @@ func (le *LeadElection) RemoveNode(uid uint64) error {
 	}
 
 	return nil
-}
-
-// IsLeader returns if the current node is the leader.
-func (le *LeadElection) IsLeader() bool {
-	return le.leaderUID != nil && *le.leaderUID == le.uid
-}
-
-// GetLeaderSync returns the current leader's UID.
-// Might be nil if no leader known yet.
-func (le *LeadElection) GetLeader() *uint64 {
-	return le.leaderUID
 }
 
 func (le *LeadElection) onLeaderAnnouncement(_ context.Context, req *pb.LeaderAnnouncementMessage) (*emptypb.Empty, error) {
