@@ -6,7 +6,7 @@ secure network
 | Algorithm | Status       | Doc                        |
 |-----------|--------------|----------------------------|
 | Raft      | Experimental | [DOC](pkg/raft/README.md)  |
-| Bully     | Experimental | [DOC](pkg/bully/README.md) |
+| Bully     | ~Stable      | [DOC](pkg/bully/README.md) |
 | CR        | Experimental | [DOC](pkg/cr/README.md)    |
 | HS        | Experimental | [DOC](pkg/hs/README.md)    |
 | LCR       | Experimental | [DOC](pkg/lcr/README.md)   |

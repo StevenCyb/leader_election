@@ -33,7 +33,7 @@ type RaftServiceClient interface {
 	// RequestVote is called by candidates to gather votes.
 	RequestVote(ctx context.Context, in *VoteMessage, opts ...grpc.CallOption) (*VoteResponse, error)
 	// Heartbeat is called by the leader to maintain its leadership.
-	Heartbeat(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Heartbeat(ctx context.Context, in *HeartbeatMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type raftServiceClient struct {
@@ -54,7 +54,7 @@ func (c *raftServiceClient) RequestVote(ctx context.Context, in *VoteMessage, op
 	return out, nil
 }
 
-func (c *raftServiceClient) Heartbeat(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *raftServiceClient) Heartbeat(ctx context.Context, in *HeartbeatMessage, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, RaftService_Heartbeat_FullMethodName, in, out, cOpts...)
@@ -73,7 +73,7 @@ type RaftServiceServer interface {
 	// RequestVote is called by candidates to gather votes.
 	RequestVote(context.Context, *VoteMessage) (*VoteResponse, error)
 	// Heartbeat is called by the leader to maintain its leadership.
-	Heartbeat(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	Heartbeat(context.Context, *HeartbeatMessage) (*emptypb.Empty, error)
 	mustEmbedUnimplementedRaftServiceServer()
 }
 
@@ -87,7 +87,7 @@ type UnimplementedRaftServiceServer struct{}
 func (UnimplementedRaftServiceServer) RequestVote(context.Context, *VoteMessage) (*VoteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestVote not implemented")
 }
-func (UnimplementedRaftServiceServer) Heartbeat(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+func (UnimplementedRaftServiceServer) Heartbeat(context.Context, *HeartbeatMessage) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
 }
 func (UnimplementedRaftServiceServer) mustEmbedUnimplementedRaftServiceServer() {}
@@ -130,7 +130,7 @@ func _RaftService_RequestVote_Handler(srv interface{}, ctx context.Context, dec 
 }
 
 func _RaftService_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(HeartbeatMessage)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func _RaftService_Heartbeat_Handler(srv interface{}, ctx context.Context, dec fu
 		FullMethod: RaftService_Heartbeat_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RaftServiceServer).Heartbeat(ctx, req.(*emptypb.Empty))
+		return srv.(RaftServiceServer).Heartbeat(ctx, req.(*HeartbeatMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }

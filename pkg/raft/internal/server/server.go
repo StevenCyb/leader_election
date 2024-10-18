@@ -18,6 +18,9 @@ var ErrCallbackNotSet = errors.New("callback is not set")
 // RequestVoteCallback is a callback function for leader announcement.
 type RequestVoteCallback func(context.Context, *pb.VoteMessage) (*pb.VoteResponse, error)
 
+// HeartbeatCallback is a callback function for leader announcement.
+type HeartbeatCallback func(context.Context, *pb.HeartbeatMessage) error
+
 // Server is a gRPC server.
 type Server struct {
 	pb.UnsafeRaftServiceServer
@@ -25,7 +28,8 @@ type Server struct {
 	grpcServer *grpc.Server
 	listener   net.Listener
 
-	onLeaderAnnouncement RequestVoteCallback
+	onRequestVote RequestVoteCallback
+	onHeartbeat   HeartbeatCallback
 }
 
 // New creates a new gRPC server.
@@ -67,26 +71,30 @@ func (s *Server) Close() {
 	}
 }
 
-// OnProbe sets the callback function for probe.
-func (s *Server) OnLeaderAnnouncement(callback RequestVoteCallback) {
-	s.onLeaderAnnouncement = callback
-}
-
 // OnRequestVote sets the callback function for request vote.
 func (s *Server) OnRequestVote(callback RequestVoteCallback) {
-	s.onLeaderAnnouncement = callback
+	s.onRequestVote = callback
+}
+
+// OnHeartbeat sets the callback function for heartbeat.
+func (s *Server) OnHeartbeat(callback HeartbeatCallback) {
+	s.onHeartbeat = callback
 }
 
 // RequestVote implements rpc.RaftServiceServer.
 func (s *Server) RequestVote(ctx context.Context, req *pb.VoteMessage) (*pb.VoteResponse, error) {
-	if s.onLeaderAnnouncement == nil {
+	if s.onRequestVote == nil {
 		return nil, ErrCallbackNotSet
 	}
 
-	return s.onLeaderAnnouncement(ctx, req)
+	return s.onRequestVote(ctx, req)
 }
 
 // Heartbeat implements rpc.RaftServiceServer.
-func (s *Server) Heartbeat(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
+func (s *Server) Heartbeat(ctx context.Context, req *pb.HeartbeatMessage) (*emptypb.Empty, error) {
+	if s.onRequestVote == nil {
+		return nil, ErrCallbackNotSet
+	}
+
+	return &emptypb.Empty{}, s.onHeartbeat(ctx, req)
 }

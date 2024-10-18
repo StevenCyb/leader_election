@@ -7,7 +7,6 @@ import (
 	pb "github.com/StevenCyb/leader_election/pkg/raft/internal/rpc"
 
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Client is a gRPC client wrapper.
@@ -50,12 +49,12 @@ func (c *Client) RequestVote(ctx context.Context, req *pb.VoteMessage) error {
 }
 
 // Heartbeat sends a heartbeat to the server.
-func (c *Client) Heartbeat(ctx context.Context) error {
+func (c *Client) Heartbeat(ctx context.Context, req *pb.HeartbeatMessage) error {
 	if c.grpcClient == nil {
 		return nil
 	}
 
-	_, err := c.grpcClient.Heartbeat(ctx, &emptypb.Empty{})
+	_, err := c.grpcClient.Heartbeat(ctx, req)
 
 	return err
 }

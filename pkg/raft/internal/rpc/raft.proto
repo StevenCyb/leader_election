@@ -18,11 +18,17 @@ message VoteResponse {
   uint64 term = 2;
 }
 
+// The HeartbeatMessage message.
+message HeartbeatMessage {
+  uint64 uid = 1;
+  uint64 term = 2;
+}
+
 // The RaftService service definition.
 service RaftService {
   // RequestVote is called by candidates to gather votes.
   rpc RequestVote(VoteMessage) returns (VoteResponse);
 
   // Heartbeat is called by the leader to maintain its leadership.
-  rpc Heartbeat(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc Heartbeat(HeartbeatMessage) returns (google.protobuf.Empty);
 }
