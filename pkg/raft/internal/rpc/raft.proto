@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package raft;
+
+option go_package = "pkg/raft/internal/rpc";
+
+// The LeaderAnnouncementMessage message.
+message VoteMessage {
+  uint64 uid = 1;
+  uint64 term = 2;
+}
+
+// The VoteResponse message.
+message VoteResponse {
+  uint64 uid = 1;
+  uint64 term = 2;
+}
+
+// The RaftService service definition.
+service RaftService {
+  // RequestVote is called by candidates to gather votes.
+  rpc RequestVote(VoteMessage) returns (VoteResponse);
+
+  // Heartbeat is called by the leader to maintain its leadership.
+  rpc Heartbeat(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

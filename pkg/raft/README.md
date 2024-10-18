@@ -19,7 +19,7 @@ majority = totalNodes/2 <= totalRespondingNodes+deadNodes
 
 Two timeouts for leader election:
 * election timeout -> amount of time a follower waits until becoming a candidate (random between 150ms and 300ms)
-* heartbeat timeout -> 
+* heartbeat timeout -> 1 sec
 
 1) At start all nodes are follower
 2) First that finds no leader or that the leader is down, they become a candidate
