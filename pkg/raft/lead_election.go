@@ -262,6 +262,7 @@ func (le *LeadElection) startElection(heartbeatTimeout time.Duration) {
 		le.electionPhaseMutex.Unlock()
 		return
 	}
+
 	le.term++
 	le.votedFor = &le.uid
 	le.logger.Debugf("Start election with term %d", le.term)
@@ -269,7 +270,7 @@ func (le *LeadElection) startElection(heartbeatTimeout time.Duration) {
 
 	le.nodesMutex.Lock()
 	majorityCount := len(le.nodes) / 2
-	if len(le.nodes)%2 != 0 {
+	if len(le.nodes)%2 == 0 {
 		majorityCount++
 	}
 	voteCount := 1
