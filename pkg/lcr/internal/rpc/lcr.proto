@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+package lcr;
+
+option go_package = "pkg/lcr/internal/rpc";
+
+// Enum for message status.
+enum Status {
+  UNKNOWN = 0;
+  RECEIVED = 1;
+  DISCARDED = 2;
+}
+
+// The message sent between processes in the LCR algorithm.
+message LCRMessage {
+  uint64 uid = 1;
+  string message_id = 2;
+  google.protobuf.Timestamp start_time = 3;
+}
+
+// Response message to acknowledge receipt of LCRMessage or termination.
+message LCRResponse {
+  Status status = 1;
+  string message_id = 2;
+}
+
+// The LCR service definition.
+service LCRService {
+  
+  // RPC for sending a message to the next process (to the left).
+  rpc Message(LCRMessage) returns (LCRResponse);
+
+  // RPC to notify the current process that the leader has been elected and termination is starting.
+  rpc NotifyTermination(LCRMessage) returns (LCRResponse);
+
+  // Ping RPC to check if the node is alive.
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

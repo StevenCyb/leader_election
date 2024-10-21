@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package cr;
+
+option go_package = "pkg/cr/internal/rpc";
+
+// Message to request the CR service.
+message Message {
+  uint64 uid = 1;
+}
+
+// The CR service definition.
+service CRService {
+  // Election RPC to start the election process.
+  rpc Election(Message) returns (google.protobuf.Empty);
+  
+  // Elected RPC to notify the node that it has been elected.
+  rpc Elected(Message) returns (google.protobuf.Empty);
+
+  // Ping RPC to check if the node is alive.
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
+}
