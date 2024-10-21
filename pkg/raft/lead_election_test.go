@@ -28,26 +28,30 @@ func (c *ClusterTester) Cleanup() {
 	}
 }
 
-func (c *ClusterTester) AddInstance(id uint64) {
+func (c *ClusterTester) AddInstance(uid uint64) {
 	c.t.Helper()
+
+	var resolveLeaderElection = func(potentialLeader uint64) bool {
+		return potentialLeader > uid
+	}
 
 	port := internal.GetFreeLocalPort(c.t)
 	listen := fmt.Sprintf("localhost:%d", port)
-	logger := log.New().SetName(fmt.Sprintf("I%d", id)).Build()
-	newInstance, err := New(id, listen, logger)
+	logger := log.New().SetName(fmt.Sprintf("I%d", uid)).Build()
+	newInstance, err := New(uid, listen, logger, resolveLeaderElection)
 	require.NoError(c.t, err)
 
 	for _, instance := range c.instances {
-		require.NoError(c.t, instance.AddNode(id, listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
+		require.NoError(c.t, instance.AddNode(uid, listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 		require.NoError(c.t, newInstance.AddNode(instance.uid, instance.listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 	}
 	for _, instance := range c.inactiveInstances {
-		require.NoError(c.t, instance.AddNode(id, listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
+		require.NoError(c.t, instance.AddNode(uid, listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 	}
 
 	newInstance.MustStart(time.Millisecond * 500)
 
-	c.instances[id] = newInstance
+	c.instances[uid] = newInstance
 }
 
 func (c *ClusterTester) Kill(id uint64) {
@@ -61,15 +65,19 @@ func (c *ClusterTester) Kill(id uint64) {
 	c.inactiveInstances[id] = instance
 }
 
-func (c *ClusterTester) Revive(id uint64) {
+func (c *ClusterTester) Revive(uid uint64) {
 	c.t.Helper()
 
-	inactiveInstance, ok := c.inactiveInstances[id]
+	var resolveLeaderElection = func(potentialLeader uint64) bool {
+		return potentialLeader > uid
+	}
+
+	inactiveInstance, ok := c.inactiveInstances[uid]
 	require.True(c.t, ok)
 
-	delete(c.inactiveInstances, id)
+	delete(c.inactiveInstances, uid)
 
-	newInstance, err := New(id, inactiveInstance.listen, inactiveInstance.logger)
+	newInstance, err := New(uid, inactiveInstance.listen, inactiveInstance.logger, resolveLeaderElection)
 	require.NoError(c.t, err)
 
 	newInstance.OnLeaderChange(func(leader *uint64) {
@@ -77,14 +85,14 @@ func (c *ClusterTester) Revive(id uint64) {
 	})
 
 	for _, instance := range c.instances {
-		require.NoError(c.t, instance.RemoveNode(id), fmt.Sprintf("failed to remove node %d from instance %d", id, instance.uid))
+		require.NoError(c.t, instance.RemoveNode(uid), fmt.Sprintf("failed to remove node %d from instance %d", uid, instance.uid))
 		require.NoError(c.t, instance.AddNode(inactiveInstance.uid, inactiveInstance.listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 		require.NoError(c.t, newInstance.AddNode(instance.uid, instance.listen, grpc.WithTransportCredentials(insecure.NewCredentials())))
 	}
 
 	newInstance.MustStart(time.Millisecond * 300)
 
-	c.instances[id] = newInstance
+	c.instances[uid] = newInstance
 }
 
 func (c *ClusterTester) ExpectLeader(delay time.Duration) {

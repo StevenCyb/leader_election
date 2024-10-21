@@ -19,16 +19,21 @@ import (
 var ErrNodeAlreadyExists = errors.New("node already exists")
 var ErrNodeNotExists = errors.New("node not exists")
 
+// LeaderElectionConflictResolveFunc is a callback function that is called when a leader conflict is detected.
+// The return value is used to determine if the leader should be changed.
+type LeaderElectionConflictResolveFunc func(potentialLeader uint64) bool
+
 // OnLeaderChangeFunc is a callback function that is called when the leader changes.
 type OnLeaderChangeFunc func(leader *uint64)
 
 type LeadElection struct {
 	// Unchanged fields
-	uid                uint64
-	listen             string
-	server             *server.Server
-	onLeaderChangeFunc OnLeaderChangeFunc
-	logger             log.ILogger
+	uid                       uint64
+	listen                    string
+	server                    *server.Server
+	onLeaderChangeFunc        OnLeaderChangeFunc
+	logger                    log.ILogger
+	leaderConflictResolveFunc LeaderElectionConflictResolveFunc
 	// Dynamic fields
 	stop               chan struct{}
 	nodesMutex         sync.RWMutex
@@ -41,20 +46,21 @@ type LeadElection struct {
 }
 
 // New creates a new LeadElection instance.
-func New(uid uint64, listen string, logger log.ILogger, opt ...grpc.ServerOption) (*LeadElection, error) {
+func New(uid uint64, listen string, logger log.ILogger, leaderConflictResolveFunc LeaderElectionConflictResolveFunc, opt ...grpc.ServerOption) (*LeadElection, error) {
 	s, err := server.New(listen, opt...)
 	if err != nil {
 		return nil, err
 	}
 
 	le := &LeadElection{
-		uid:    uid,
-		listen: listen,
-		logger: logger,
-		server: s,
-		stop:   make(chan struct{}),
-		nodes:  make(map[uint64]*client.Client),
-		timer:  internal.Timer{},
+		uid:                       uid,
+		listen:                    listen,
+		logger:                    logger,
+		server:                    s,
+		leaderConflictResolveFunc: leaderConflictResolveFunc,
+		stop:                      make(chan struct{}),
+		nodes:                     make(map[uint64]*client.Client),
+		timer:                     internal.Timer{},
 	}
 
 	s.OnRequestVote(le.onRequestVote)
@@ -202,7 +208,7 @@ func (le *LeadElection) onHeartbeat(_ context.Context, req *pb.HeartbeatMessage)
 	le.electionPhaseMutex.Lock()
 	defer le.electionPhaseMutex.Unlock()
 
-	if req.Term > le.term {
+	if req.Term > le.term || le.leaderUID == nil {
 		le.logger.Debugf("Elected leader %d on term %d", req.Uid, req.Term)
 		le.term = req.Term
 		le.leaderUID = &req.Uid
@@ -212,6 +218,11 @@ func (le *LeadElection) onHeartbeat(_ context.Context, req *pb.HeartbeatMessage)
 			le.onLeaderChangeFunc(le.leaderUID)
 		}
 	} else if req.Term == le.term {
+		if req.Uid != *le.leaderUID {
+			if le.leaderConflictResolveFunc(req.Uid) {
+				le.leaderUID = &req.Uid
+			}
+		}
 		le.timer.Reset()
 	}
 

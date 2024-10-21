@@ -1,41 +1,39 @@
 # Raft
-The Raft algorithm is used for leader election in distributed systems. Each server starts as a follower. If a follower doesn’t receive a heartbeat from the leader within a timeout, it becomes a candidate and starts an election by requesting votes from other servers. Servers vote for the candidate with the most up-to-date log. If a candidate receives a majority of votes, it becomes the leader and sends heartbeats to maintain its authority. If no candidate wins, the process repeats. The leader manages log replication to ensure consistency across the cluster.
+The Raft algorithm is a consensus algorithm and leader election in distributed systems. Each server starts as a follower. If a follower doesn’t receive a heartbeat from the leader within a timeout, it becomes a candidate and starts an election by requesting votes from other servers. Servers vote for the candidate with the most up-to-date log. If a candidate receives a majority of votes, it becomes the leader and sends heartbeats to maintain its authority. If no candidate wins, the process repeats. The leader manages log replication to ensure consistency across the cluster.
 
 An visualization of this algorithm is provide on the [Raft Homepage](https://raft.github.io/) and a more precise explanation [here](https://thesecretlivesofdata.com/raft/).
 
 ## Usage
-On you service setup the Raft service like this:
+On you service setup the Raft service as follow. 
+This implementation does not handle log replication, therefore the `resolveLeaderElection` is needed to resolve conflicts,
+where the log may decide the new leader. 
 ```go
-
+uid, err := strconv.ParseUint(os.Getenv("LB_ID"), 10, 64)
+// ...
+var resolveLeaderElection = func(potentialLeader uint64) bool {
+    return potentialLeader > uid
+}
+// ...
+logger := log.New().Build()
+instance, err := New(uid, listen, logger, resolveLeaderElection)
+// ...
+// Add all other nodes from the cluster with there id and listen address
+instance.AddNode(id, listen, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// ...
+// Start the leader service
+instance.MustStart(delayDuration, checkIntervalDuration)
+// ...
+// Optionally register for leader change event if needed
+instance.OnLeaderChange(func(leader *uint64) {
+  if leader != nil {
+    // Got new leader
+  }
+})
+// Get the leader
+leader := instance.GetLeader()
+// Check if is leader 
+if instance.IsLeader() {
+  // ...
+}
+// ...
 ```
-
-## TODO remove this later (notes)
-1) At start all nodes are follower
-2) First that finds no leader or that the leader is down, they become a candidate
-3) Leader election
-   3.1) New leader start a new term
-   3.2) Candidates request vote from other
-   3.3) Follower nodes will respond with there vote (follower can only vote to the first one they get a request + reset there election timeout)
-   3.4) The candidate becomes the leader if it gets votes from a majority of nodes
-        * a split vote can occur
-          3.4.1) Will get to the next term and pick new election timeout
-   3.5) Leader sends Heartbeat Append Entries message to his followers (they respond and reset there election timeout)
-        * If a "leader" gets a leader heartbeat from higher term
-          3.5.1) its accept him as leader
-          * based on state:
-            3.5.1) Leader A has higher term and fewer committed logs:
-                   Action: Leader A will send its log entries to the followers. Followers will compare the logs and send back any missing committed entries to Leader A. Leader A will update its log to include these committed entries.
-            3.5.2) Leader A has higher term and fewer uncommitted logs:
-                   Action: Leader A will send its log entries to the followers. Followers will respond with their logs, and Leader A will update its log to match the followers’ logs, ensuring all uncommitted entries are included.
-            3.5.3) Leader A has higher term and more uncommitted logs:
-                   Action: Leader A will send its log entries to the followers. Followers will accept these entries and update their logs to match Leader A’s log. Uncommitted entries will be replicated across the cluster.
-            3.5.4) Leader A has higher term and more committed logs:
-                   Action: Leader A will send its log entries to the followers. Followers will accept these entries and update their logs to match Leader A’s log. Committed entries will be propagated to ensure consistency. 
-4) Log Replication
-  4.4) Changes are going trough leader and they are added to the log
-  4.5) At first he log is uncommitted
-  4.6) This log is than send to all follower with the next Append Entries message (heartbeat)
-  4.7) Respond to client sended the change request (not needed for me?)
-  4.8) Leader is waiting till the majority have written the entry
-  4.9) The log on the leader is now committed
-  4.10) Leader notify follower that log is now committed, so also for them
