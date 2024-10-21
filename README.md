@@ -1,11 +1,12 @@
 # Leader Election in GoLang
 This repository contains some leader election algorithms written in Go. 
 Most of them were implemented just as a warm-up and may not be suitable for production use. 
-In general, I plan to further develop one of the algorithms in order to use this implementation in another project.
+In general, I plan to further develop one of the algorithms in order to use this implementation in another project (might be Raft or Zab).
 
 # Algorithm
 | Algorithm | Status       | Doc                        |
 |-----------|--------------|----------------------------|
+| Zab       | Experimental | [DOC](pkg/zab/README.md)   |
 | Raft      | Experimental | [DOC](pkg/raft/README.md)  |
 | Bully     | ~Stable      | [DOC](pkg/bully/README.md) |
 | CR        | Experimental | [DOC](pkg/cr/README.md)    |
